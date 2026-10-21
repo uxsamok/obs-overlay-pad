@@ -1,14 +1,13 @@
-﻿# Удаление: задача + правило брандмауэра + остановка caddy. Папку удаляет по желанию.
+﻿# Удаление автозапуска и правила брандмауэра этой установки. Папку можно удалить потом вручную.
 . "$PSScriptRoot\common.ps1"
 Assert-Admin
-Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
-Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
-Get-Process caddy -ErrorAction SilentlyContinue | Stop-Process -Force
-Get-NetFirewallRule -DisplayName $FwRule -ErrorAction SilentlyContinue | Remove-NetFirewallRule
-Write-Host 'Задача и правило брандмауэра удалены.' -ForegroundColor Green
-$a = Read-Host "Удалить и папку $InstallDir целиком? (y/N)"
-if ($a -eq 'y') {
-    Set-Location $env:TEMP
-    Remove-Item $InstallDir -Recurse -Force
-    Write-Host 'Папка удалена.'
+Stop-KitCaddy
+$t = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+if ($t -and $t.Actions[0].WorkingDirectory -eq $KitDir) {
+    Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
+    Get-NetFirewallRule -DisplayName $FwRule -ErrorAction SilentlyContinue | Remove-NetFirewallRule
+    Write-Host 'Задача и правило брандмауэра удалены.' -ForegroundColor Green
+} else {
+    Write-Host "Задача '$TaskName' этой папки не найдена — нечего удалять." -ForegroundColor Yellow
 }
+Write-Host "Теперь папку $KitDir можно просто удалить."

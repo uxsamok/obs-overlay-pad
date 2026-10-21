@@ -1,42 +1,53 @@
-﻿# Установка: caddy.exe + приложение + автозапуск + брандмауэр. Можно запускать повторно.
+﻿# Установка в ЭТУ папку: caddy.exe + app\ + Caddyfile + автозапуск + брандмауэр.
+# Повторный запуск безопасен. Перенесли папку или сменили порт — запустите снова.
 . "$PSScriptRoot\common.ps1"
 Assert-Admin
+Write-Host "Папка установки: $KitDir, порт: $Port"
 
-New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
-
-# 1. Серверные файлы (скрипты, Caddyfile, README) копируем в C:\obs-overlay-pad
-if ((Resolve-Path $PSScriptRoot).Path -ne (Resolve-Path $InstallDir).Path) {
-    Get-ChildItem $PSScriptRoot -File | Copy-Item -Destination $InstallDir -Force
+# Убрать задачи/правила этой же папки, оставшиеся от прошлого порта
+Get-ScheduledTask -TaskName 'OBS Overlay Pad (port *)' -ErrorAction SilentlyContinue |
+    Where-Object { $_.TaskName -ne $TaskName -and $_.Actions[0].WorkingDirectory -eq $KitDir } |
+    ForEach-Object {
+        Write-Host "Удаляю старую задачу $($_.TaskName)"
+        Stop-ScheduledTask -TaskName $_.TaskName -ErrorAction SilentlyContinue
+        Unregister-ScheduledTask -TaskName $_.TaskName -Confirm:$false
+        $old = $_.TaskName -replace '^OBS Overlay Pad \(port (\d+)\)$', 'OBS Overlay Pad HTTP $1'
+        Get-NetFirewallRule -DisplayName $old -ErrorAction SilentlyContinue | Remove-NetFirewallRule
+    }
+$existing = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+if ($existing -and $existing.Actions[0].WorkingDirectory -ne $KitDir) {
+    Write-Host "Порт $Port уже занимала установка в $($existing.Actions[0].WorkingDirectory) — она будет заменена этой." -ForegroundColor Yellow
 }
 
-# 2. Останавливаем старый запуск (если переустановка)
-Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
-Get-Process caddy -ErrorAction SilentlyContinue | Stop-Process -Force
+Stop-KitCaddy
+if ($existing) { Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue }
 
-# 3. caddy.exe — официальная сборка Windows amd64
-$caddy = Join-Path $InstallDir 'caddy.exe'
-Write-Host "Скачиваю Caddy: $CaddyUrl"
-Invoke-WebRequest -Uri $CaddyUrl -OutFile "$caddy.download" -UseBasicParsing
-Move-Item "$caddy.download" $caddy -Force
-& $caddy version
+New-Item -ItemType Directory -Path $LogDir -Force | Out-Null
 
-# 4. Приложение
-Update-App
+Install-Caddy
+& $Caddy version
 
-# 5. Задача планировщика: при старте Windows, от SYSTEM (без окна, без входа в систему),
-#    перезапуск при сбое, без ограничения времени работы.
-$action   = New-ScheduledTaskAction -Execute $caddy -Argument "run --config `"$InstallDir\Caddyfile`" --adapter caddyfile" -WorkingDirectory $InstallDir
+if (Test-Path (Join-Path $AppDir 'index.html')) {
+    Write-Host 'Приложение уже есть (обновить: update.bat).'
+} else {
+    Update-App
+}
+
+Write-Caddyfile
+& $Caddy validate --config $CaddyFile --adapter caddyfile
+if ($LASTEXITCODE -ne 0) { throw 'Caddyfile не прошёл проверку.' }
+
+# Задача: при старте Windows от SYSTEM (без окна и без входа), перезапуск при сбое.
+$action   = New-ScheduledTaskAction -Execute $Caddy -Argument "run --config `"$CaddyFile`" --adapter caddyfile" -WorkingDirectory $KitDir
 $trigger  = New-ScheduledTaskTrigger -AtStartup
 $principal= New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
 $settings = New-ScheduledTaskSettingsSet -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) `
             -ExecutionTimeLimit ([TimeSpan]::Zero) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
 Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null
 
-# 6. Брандмауэр: входящие TCP 8080, только частная сеть
 Get-NetFirewallRule -DisplayName $FwRule -ErrorAction SilentlyContinue | Remove-NetFirewallRule
 New-NetFirewallRule -DisplayName $FwRule -Direction Inbound -Protocol TCP -LocalPort $Port -Action Allow -Profile Private | Out-Null
 
-# 7. Запуск
 Start-ScheduledTask -TaskName $TaskName
 Start-Sleep -Seconds 2
 Write-Host ''

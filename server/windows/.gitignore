@@ -1,0 +1,8 @@
+caddy.exe
+caddy.exe.download
+Caddyfile
+app/
+app.bak/
+app.new/
+app.swap/
+logs/

@@ -1,15 +1,36 @@
-﻿# Общие настройки и функции. Подключается остальными скриптами.
+﻿# Общие пути и функции. Всё вычисляется от папки, где лежат скрипты ($PSScriptRoot),
+# поэтому набор работает из любой папки. Настройки — в config.ps1.
 $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 $ProgressPreference = 'SilentlyContinue'   # иначе Invoke-WebRequest очень медленный
 
-$InstallDir = 'C:\obs-overlay-pad'
-$AppDir     = Join-Path $InstallDir 'app'
-$TaskName   = 'OBS Overlay Pad (Caddy)'
-$FwRule     = 'OBS Overlay Pad HTTP 8080'
-$Port       = 8080
+. (Join-Path $PSScriptRoot 'config.ps1')
+
+$KitDir     = $PSScriptRoot
+$AppDir     = Join-Path $KitDir 'app'
+$LogDir     = Join-Path $KitDir 'logs'
+$Caddy      = Join-Path $KitDir 'caddy.exe'
+$CaddyFile  = Join-Path $KitDir 'Caddyfile'
+# Имя включает порт: на одном компьютере у каждой установки свой порт -> свои имена.
+$TaskName   = "OBS Overlay Pad (port $Port)"
+$FwRule     = "OBS Overlay Pad HTTP $Port"
 $RepoZipUrl = 'https://codeload.github.com/uxsamok/obs-overlay-pad/zip/refs/heads/main'
-$CaddyUrl   = 'https://caddyserver.com/api/download?os=windows&arch=amd64'
+$CaddyReleaseApi = 'https://api.github.com/repos/caddyserver/caddy/releases/latest'
+
+# Скачивает последнюю официальную сборку Caddy (Windows amd64) с GitHub в $Caddy.
+function Install-Caddy {
+    $rel = Invoke-RestMethod -Uri $CaddyReleaseApi -UseBasicParsing
+    $asset = $rel.assets | Where-Object { $_.name -like '*_windows_amd64.zip' } | Select-Object -First 1
+    if (-not $asset) { throw "Не нашёл windows_amd64.zip в релизе Caddy $($rel.tag_name)" }
+    Write-Host "Скачиваю Caddy $($rel.tag_name): $($asset.browser_download_url)"
+    $tmp = Join-Path $env:TEMP ('caddy-' + [guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $tmp | Out-Null
+    try {
+        Invoke-WebRequest -Uri $asset.browser_download_url -OutFile "$tmp\caddy.zip" -UseBasicParsing
+        Expand-Archive "$tmp\caddy.zip" -DestinationPath $tmp -Force
+        Copy-Item "$tmp\caddy.exe" $Caddy -Force
+    } finally { Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue }
+}
 
 function Assert-Admin {
     $p = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
@@ -24,7 +45,41 @@ function Get-LanUrls {
         ForEach-Object { "http://$($_.IPAddress):$Port" }
 }
 
-# Скачивает main из GitHub и кладёт файлы приложения в $AppDir (старая версия -> app.bak).
+# Останавливает только caddy из ЭТОЙ папки (другие установки не трогает).
+function Stop-KitCaddy {
+    Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+    Get-Process caddy -ErrorAction SilentlyContinue |
+        Where-Object { $_.Path -eq $Caddy } | Stop-Process -Force
+}
+
+# Caddyfile генерируется из config.ps1 (руками не правьте — перезапишется).
+function Write-Caddyfile {
+    $c = @"
+# СГЕНЕРИРОВАНО install.ps1 из config.ps1 — правки здесь перезапишутся.
+# Обычный HTTP: приложение ходит в OBS по ws://, со страницы https:// это запрещено.
+{
+	auto_https off
+	admin off
+	log {
+		output file "$($LogDir -replace '\\','/')/caddy.log" {
+			roll_size 5MiB
+			roll_keep 3
+		}
+	}
+}
+
+:$Port {
+	root * "$($AppDir -replace '\\','/')"
+	encode gzip
+	# no-cache: браузер всегда сверяется с сервером, обновления доходят сразу
+	header Cache-Control "no-cache"
+	file_server
+}
+"@
+    [IO.File]::WriteAllText($CaddyFile, $c)
+}
+
+# Скачивает main с GitHub и кладёт файлы приложения в app\ (старая версия -> app.bak).
 function Update-App {
     $tmp = Join-Path $env:TEMP ('overlay-pad-' + [guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Path $tmp | Out-Null
@@ -37,7 +92,6 @@ function Update-App {
         if (-not $src -or -not (Test-Path (Join-Path $src.FullName 'index.html'))) {
             throw 'В архиве нет index.html — обновление отменено, текущая версия не тронута.'
         }
-        # Новая версия собирается рядом (app.new), затем быстрая подмена папок.
         $new = "$AppDir.new"; $bak = "$AppDir.bak"
         if (Test-Path $new) { Remove-Item $new -Recurse -Force }
         New-Item -ItemType Directory -Path $new | Out-Null
