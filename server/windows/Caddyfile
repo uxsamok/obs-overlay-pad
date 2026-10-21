@@ -1,0 +1,16 @@
+# Caddy: раздаёт папку app\ по обычному HTTP на порту 8080 (весь LAN).
+# HTTPS выключен намеренно: приложение ходит в OBS по ws:// (не wss://),
+# а со страницы https:// браузер запретит ws://.
+{
+	auto_https off
+	admin off
+}
+
+:8080 {
+	root * app
+	encode gzip
+	# no-cache = браузер каждый раз переспрашивает сервер (дёшево, ответ 304),
+	# поэтому после update.bat планшет сразу получает новые файлы.
+	header Cache-Control "no-cache"
+	file_server
+}
