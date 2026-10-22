@@ -292,7 +292,7 @@ function renderSettings() {
   const items = [...act.index.keys()].sort((a, b) => a.localeCompare(b)); // всё, что стоит в сценах
   // Ячейки: <input list> — набор текста фильтрует варианты (удобно при многих источниках)
   const dl = (l) => l.map((n) => `<option value="${esc(n)}">`).join('');
-  $('#srcList').innerHTML = dl(items); $('#inpList').innerHTML = dl(act.inputs);
+  $('#srcList').innerHTML = dl(items); $('#inpList').innerHTML = dl(act.inputs); $('#sceneList').innerHTML = dl(act.scenes);
   if (obs.identified && !renderSettings.mic) act.audioInputs().then((l) => { renderSettings.mic = l; renderSettings(); }).catch(() => {});
   v.querySelector('#g').innerHTML =
     box('Подключение OBS', `<div class="gset">
@@ -303,7 +303,8 @@ function renderSettings() {
       <label>Колонок <input data-g="grid.cols" type="number" min="1" max="12" value="${S.grid.cols}"></label>
       <label>Рядов на экране <input data-g="grid.rows" type="number" min="1" max="12" value="${S.grid.rows}"></label>
       <label>Всего ячеек <input data-g="grid.total" type="number" min="1" max="500" value="${S.grid.total}"></label>
-      <label>Сцена с оверлеями (для «Скрыть всё») ${pick('data-g="overlaysScene"', S.overlaysScene, act.scenes)}</label></div>`) +
+      <label>Сцена с оверлеями (для «Скрыть всё») ${(() => { const miss = S.overlaysScene && obs.identified && !act.scenes.includes(S.overlaysScene);
+        return `<input data-g="overlaysScene" value="${esc(S.overlaysScene)}" list="sceneList" placeholder="Начните вводить имя…" autocomplete="off"${miss ? ' class="miss" title="Нет в OBS"' : ''}>${miss ? '<div class="warnsm">⚠ нет в OBS</div>' : ''}`; })()}</label></div>`) +
     box('Повтор (Replay Buffer)', `<p class="hint">Буфер повтора запускается сам. Нужен Media Source в сцене, скрытый, без «Зациклить». <details><summary>Подробнее</summary>OBS: Настройки → Вывод → Буфер повтора — включить, 30 с. Добавьте «Медиа» (Media Source), снимите «Зациклить», скройте, выберите его ниже. Дальше: «⟲ Сохранить повтор» → «▶ Показать повтор».</details></p>
       <div class="gset"><label>Media Source для повтора ${pick('data-g="replay.mediaSource"', S.replay.mediaSource, act.inputs)}</label></div>`) +
     box('Таймер игры', `<div class="gset"><label>Текстовый источник таймера ${pick('data-g="gameTimer.source"', S.gameTimer.source, act.inputs)}</label></div>
