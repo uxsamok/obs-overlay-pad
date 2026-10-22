@@ -1,7 +1,8 @@
+import { t } from './i18n.js';
 const KEY = 'obs-overlay-pad-v1'; // ключ хранилища, НЕ версия приложения (не менять — потеряются настройки)
 export function defaultCell(i) {
-  return { label: `Оверлей ${i + 1}`, color: '#2b3a55', type: 'overlay', source: '', mode: 'timer', duration: 8,
-    timecode: false, startGameTimer: false, counterTemplate: 'Матч {n}', counterValue: 1 };
+  return { label: t('defaults.cellLabel', { n: i + 1 }), color: '#2b3a55', type: 'overlay', source: '', mode: 'timer', duration: 8,
+    timecode: false, startGameTimer: false, counterTemplate: t('defaults.counterTemplate'), counterValue: 1 };
 }
 export function defaultState() {
   return {
@@ -11,7 +12,7 @@ export function defaultState() {
     overlaysScene: 'Overlays',
     gameTimer: { source: '', format: 'mm:ss' },
     replay: { mediaSource: '' },
-    match: { source: '', template: 'Матч {n}', value: 1 }, // номер матча (− N + в шапке)
+    match: { source: '', template: t('defaults.counterTemplate'), value: 1 }, // номер матча (− N + в шапке)
     mic: { source: '' }, // аудиовход OBS для кнопки «Мик»
     cells: Array.from({ length: 12 }, (_, i) => defaultCell(i)),
     streams: [], // {id, title, startedAt, marks:[{t, label}]}

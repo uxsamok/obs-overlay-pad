@@ -1,3 +1,4 @@
+import { t } from './i18n.js';
 // Слой действий: UI вызывает только эти функции, а не OBS напрямую.
 // В v2 сюда добавятся действия для локальных Browser Source (obs.broadcast).
 export class Actions extends EventTarget {
@@ -25,7 +26,7 @@ export class Actions extends EventTarget {
   }
   lookup(name) {
     const refs = this.index.get(name) || [];
-    if (!refs.length) throw new Error(`Источник «${name}» не найден в OBS`);
+    if (!refs.length) throw new Error(t('err.notFound', { name }));
     return refs[0];
   }
   duplicates(name) { return (this.index.get(name) || []).length > 1; }
@@ -53,7 +54,7 @@ export class Actions extends EventTarget {
   }
   async playLastReplay(mediaSource) {
     const path = await this.getLastReplay();
-    if (!path) throw new Error('Повторов пока нет — сначала «Сохранить повтор»');
+    if (!path) throw new Error(t('err.noReplays'));
     const ref = this.lookup(mediaSource);
     await this.setVisible(ref, false);
     // Сбрасываем файл и ставим новый: так Media Source гарантированно перечитывает видео,

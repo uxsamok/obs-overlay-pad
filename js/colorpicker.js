@@ -1,3 +1,4 @@
+import { t } from './i18n.js';
 // Лёгкий выбор цвета (вместо системного: на Android он показывает 3 поля).
 // Окно поверх страницы: превью, поле #hex, готовые цвета, область насыщенность/яркость + полоса оттенка.
 export const SWATCHES = ['#2b3a55', '#3b5bdb', '#1971c2', '#0c8599', '#2b8a3e', '#5c940d', '#e67700', '#d9480f', '#c92a2a', '#a61e4d', '#862e9c', '#495057'];
@@ -24,7 +25,7 @@ function build() {
     <div class="cp-sw">${SWATCHES.map((h) => `<button type="button" data-h="${h}" style="background:${h}"></button>`).join('')}</div>
     <div class="cp-sv"><div class="cp-dot"></div></div>
     <div class="cp-hue"><div class="cp-knob"></div></div>
-    <div class="cp-btns"><button type="button" class="cp-cancel">Отмена</button><button type="button" class="cp-ok">Готово</button></div></div>`;
+    <div class="cp-btns"><button type="button" class="cp-cancel" data-i18n="cp.cancel">${t('cp.cancel')}</button><button type="button" class="cp-ok" data-i18n="cp.ok">${t('cp.ok')}</button></div></div>`;
   document.body.appendChild(el);
   const q = (s) => el.querySelector(s);
   const drag = (area, fn) => area.addEventListener('pointerdown', (e) => {

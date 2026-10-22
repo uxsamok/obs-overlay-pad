@@ -1,3 +1,4 @@
+import { t } from './i18n.js';
 // Минимальный клиент obs-websocket v5 (без зависимостей)
 async function sha256b64(s) {
   const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
@@ -20,7 +21,7 @@ export class ObsClient extends EventTarget {
     ws.onmessage = (m) => this._onMsg(JSON.parse(m.data));
     ws.onclose = (e) => {
       this.identified = false;
-      for (const p of this.pending.values()) p.reject(new Error('Соединение закрыто'));
+      for (const p of this.pending.values()) p.reject(new Error(t('err.connClosed')));
       this.pending.clear();
       this._status('disconnected', e.reason || '');
       this._schedule();
@@ -46,12 +47,12 @@ export class ObsClient extends EventTarget {
     }
   }
   call(requestType, requestData = {}) {
-    if (!this.identified) return Promise.reject(new Error('Нет соединения с OBS'));
+    if (!this.identified) return Promise.reject(new Error(t('err.noObs')));
     const requestId = String(++this.seq);
     return new Promise((resolve, reject) => {
       this.pending.set(requestId, { resolve, reject });
       this.ws.send(JSON.stringify({ op: 6, d: { requestType, requestId, requestData } }));
-      setTimeout(() => { if (this.pending.delete(requestId)) reject(new Error(requestType + ': таймаут')); }, 8000);
+      setTimeout(() => { if (this.pending.delete(requestId)) reject(new Error(t('err.timeout', { req: requestType }))); }, 8000);
     });
   }
   // v2: команды для локальных Browser Source страниц

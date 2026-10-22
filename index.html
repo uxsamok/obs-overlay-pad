@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ru"><head>
+<html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#11151c"><title>OBS Overlay Pad</title>
 <link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icons/icon.svg"><link rel="stylesheet" href="css/styles.css">
@@ -8,44 +8,44 @@
   <header class="mainhdr">
     <div class="stat">
       <span id="conn" class="conn">OBS …</span>
-      <span id="live" class="live">○ НЕ В ЭФИРЕ</span><span id="rec" class="rec">○ REC</span><span id="buf" class="buf" role="button">○ Буфер</span><span id="elapsed"></span>
+      <span id="live" class="live"></span><span id="rec" class="rec">○ REC</span><span id="buf" class="buf" role="button"></span><span id="elapsed"></span>
       <span id="gtimer" class="gtimer"></span><span id="clock" class="clock"></span>
     </div>
     <span class="sp"></span>
     <!-- главные кнопки во время эфира: крупные, отдельно от второстепенных -->
     <div class="prim">
-      <button id="btnMark">★ Момент</button>
-      <button id="btnReplay">⟲ Сохранить повтор</button>
-      <button id="btnPlay">▶ Показать повтор</button>
-      <button id="btnMic" class="dim">🎤 Мик</button>
-      <div id="match" class="match"><button data-md="-1" aria-label="матч минус">−</button><span id="matchN">Матч 1</span><button data-md="1" aria-label="матч плюс">+</button></div>
+      <button id="btnReplay" data-i18n="hdr.saveReplay"></button>
+      <button id="btnPlay"></button>
+      <button id="btnMic" class="dim"></button>
+      <div id="match" class="match"><button data-md="-1" data-i18n-aria="hdr.matchMinus">−</button><span id="matchN"></span><button data-md="1" data-i18n-aria="hdr.matchPlus">+</button></div>
     </div>
     <div class="sec">
-      <button id="btnHide">Скрыть всё</button>
-      <a class="btn" href="#timecodes">Таймкоды</a>
-      <a class="btn" href="#settings" aria-label="Настройки">⚙</a>
+      <button id="btnHide" data-i18n="hdr.hideAll"></button>
+      <a class="btn" href="#timecodes" data-i18n="hdr.timecodes"></a>
+      <a class="btn" href="#settings" data-i18n-aria="hdr.settings">⚙</a>
     </div>
   </header>
-  <main><div id="grid"></div><div class="side"><nav id="pages"></nav><span class="sp"></span><button id="btnReorder" title="Переставить ячейки">⇅</button></div></main>
+  <main><div id="grid"></div><div class="side"><nav id="pages"></nav><span class="sp"></span><button id="btnReorder" data-i18n-title="hdr.reorder" data-i18n-aria="hdr.reorder">⇅</button></div></main>
 </div>
 <div id="v-settings" class="view page-scroll" hidden>
-  <header><a class="btn" href="#main">← Назад</a><h2>Настройки</h2><span class="sp"></span>
-    <button id="btnRescan">Обновить список из OBS</button></header>
+  <header><a class="btn" href="#main" data-i18n="nav.back"></a><h2 data-i18n="settings.title"></h2><span class="sp"></span>
+    <button id="btnRescan" data-i18n="settings.rescan"></button></header>
   <div id="g"></div>
     <datalist id="srcList"></datalist><datalist id="inpList"></datalist><datalist id="sceneList"></datalist>
-  <section class="box"><h3>Ячейки</h3>
-    <p class="hint">Порядок ячеек меняется на главном экране кнопкой ⇅ (справа внизу).</p>
-    <div class="tblwrap"><table><thead><tr><th>№</th><th>Текст</th><th>Цвет</th><th>Тип</th><th>Источник OBS</th><th>Режим / шаблон</th><th>Длит., с</th><th>Таймкод</th></tr></thead><tbody></tbody></table></div>
+  <section class="box"><h3 data-i18n="settings.cells.title"></h3>
+    <p class="hint" data-i18n="settings.cells.hint"></p>
+    <div class="tblwrap"><table><thead><tr><th data-i18n="th.num"></th><th data-i18n="th.label"></th><th data-i18n="th.color"></th><th data-i18n="th.type"></th><th data-i18n="th.source"></th><th data-i18n="th.mode"></th><th data-i18n="th.duration"></th><th data-i18n="th.timecode"></th></tr></thead><tbody></tbody></table></div>
   </section>
-  <section class="box"><h3>Резервная копия</h3>
-    <button id="btnExport">Сохранить JSON</button>
-    <label class="btn">Загрузить JSON<input id="fileImport" type="file" accept="application/json,.json" hidden></label>
+  <section class="box"><h3 data-i18n="settings.backup.title"></h3>
+    <button id="btnExport" data-i18n="settings.backup.export"></button>
+    <label class="btn"><span data-i18n="settings.backup.import"></span><input id="fileImport" type="file" accept="application/json,.json" hidden></label>
+    <p class="hint" data-i18n="settings.backup.hint"></p>
   </section>
-  <section class="box"><h3>Сброс</h3><button id="btnReset" class="danger">Сбросить все настройки</button></section>
+  <section class="box"><h3 data-i18n="settings.reset.title"></h3><button id="btnReset" class="danger" data-i18n="settings.reset.button"></button></section>
   <p class="ver">OBS Overlay Pad <span id="ver"></span></p>
 </div>
 <div id="v-timecodes" class="view page-scroll" hidden>
-  <header><a class="btn" href="#main">← Назад</a><h2>Таймкоды</h2><span class="sp"></span><button id="btnNewStream">Новый стрим</button></header>
+  <header><a class="btn" href="#main" data-i18n="nav.back"></a><h2 data-i18n="tc.title"></h2><span class="sp"></span><button id="btnNewStream" data-i18n="tc.newStream"></button></header>
   <div id="tc"></div>
 </div>
 <div id="toast"></div>
