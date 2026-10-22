@@ -20,7 +20,8 @@ function toast(msg, err) { const t = $('#toast'); t.textContent = msg; t.classNa
 obs.addEventListener('status', async (e) => {
   const st = e.detail.status; const el = $('#conn');
   el.className = 'conn ' + st; el.textContent = { connected: 'OBS ✓', connecting: 'OBS …', disconnected: 'OBS ✕', error: 'OBS ✕' }[st];
-  if (st === 'connected') { try { await act.rebuildIndex(); await poll(); } catch (err) { toast(err.message, true); } }
+  if (st === 'connected') { try { await act.rebuildIndex(); await poll(); setBuffer(await act.replayBufferActive()); } catch (err) { toast(err.message, true); } }
+  else setBuffer(null);
   renderGrid();
 });
 for (const ev of ['SceneItemCreated', 'SceneItemRemoved', 'InputNameChanged', 'SceneCreated', 'SceneRemoved', 'SceneNameChanged'])
@@ -28,6 +29,17 @@ for (const ev of ['SceneItemCreated', 'SceneItemRemoved', 'InputNameChanged', 'S
 obs.addEventListener('StreamStateChanged', (e) => { if (e.detail.outputState === 'OBS_WEBSOCKET_OUTPUT_STARTED') newStream(); poll(); });
 obs.addEventListener('RecordStateChanged', () => poll());
 obs.addEventListener('ReplayBufferSaved', (e) => { act.lastReplay = e.detail.savedReplayPath; toast('Повтор сохранён'); });
+// Replay Buffer: индикатор на кнопке «Буфер»
+let bufferOn = null; // true / false / null (неизвестно — нет связи с OBS)
+function setBuffer(on) { bufferOn = on; const b = $('#btnBuffer'); b.classList.toggle('on', on === true); b.textContent = (on ? '● ' : '○ ') + 'Буфер'; }
+obs.addEventListener('ReplayBufferStateChanged', (e) => setBuffer(e.detail.outputActive));
+// Повтор доиграл до конца — прячем Media Source и гасим подсветку ячеек повтора
+obs.addEventListener('MediaInputPlaybackEnded', (e) => {
+  if (!S.replay.mediaSource || e.detail.inputName !== S.replay.mediaSource) return;
+  let had = false;
+  for (const [i, st] of [...active]) if (S.cells[i]?.type === 'replay') { clearTimeout(st.timer); active.delete(i); updateCell(i); had = true; }
+  if (had) act.hide(S.replay.mediaSource).catch(() => {});
+});
 obs.addEventListener('SceneItemEnableStateChanged', (e) => {
   // синхронизация подсветки переключателей, если оверлей выключили в самом OBS
   S.cells.forEach((c, i) => { if (c.type === 'overlay' && c.mode === 'toggle' && c.source) {
@@ -83,6 +95,7 @@ function startActive(i, source) {
 async function stopCell(i) {
   const st = active.get(i); if (!st) return; clearTimeout(st.timer); active.delete(i); updateCell(i);
   try { await act.hide(st.source || S.cells[i].source); } catch (err) { toast(err.message, true); }
+  if (S.cells[i].type === 'replay') act.stopMedia(st.source).catch(() => {}); // остановить видео, а не только скрыть
 }
 function startGameTimer() { gameTimer = { start: Date.now() }; }
 function tickGameTimer() {
@@ -136,6 +149,13 @@ $('#btnMark').onclick = () => { const n = curStream().marks.filter((m) => m.labe
 $('#btnHide').onclick = async () => { try { const on = await act.toggleOverlaysScene(); $('#btnHide').classList.toggle('alert', !on); toast(on ? 'Оверлеи показаны' : 'Все оверлеи скрыты');
   if (!on) for (const i of [...active.keys()]) { clearTimeout(active.get(i).timer); } } catch (err) { toast(err.message, true); } };
 $('#btnReplay').onclick = () => act.saveReplay().catch((err) => toast(err.message.includes('604') || /not active/i.test(err.message) ? 'Replay Buffer не запущен в OBS' : err.message, true));
+$('#btnBuffer').onclick = async () => {
+  if (!obs.identified) { toast('Нет соединения с OBS', true); return; }
+  try {
+    if (bufferOn) { if (!confirm('Остановить Replay Buffer? Несохранённый повтор пропадёт.')) return; await act.stopReplayBuffer(); toast('Replay Buffer остановлен'); }
+    else { await act.startReplayBuffer(); toast('Replay Buffer запущен'); }
+  } catch (err) { toast(/604|not active|disabled|500/i.test(err.message) ? 'Не удалось: включите буфер повтора в настройках OBS (Вывод → Буфер повтора)' : err.message, true); }
+};
 $('#gtimer').onclick = () => { if (gameTimer && confirm('Остановить таймер игры?')) { gameTimer = null; tickGameTimer(); } };
 
 setInterval(() => {

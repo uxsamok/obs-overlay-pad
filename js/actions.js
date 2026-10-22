@@ -54,6 +54,10 @@ export class Actions extends EventTarget {
     await this.show(mediaSource);
     try { await this.obs.call('TriggerMediaInputAction', { inputName: mediaSource, mediaAction: 'OBS_WEBSOCKET_MEDIA_INPUT_ACTION_RESTART' }); } catch {}
   }
+  stopMedia(mediaSource) { return this.obs.call('TriggerMediaInputAction', { inputName: mediaSource, mediaAction: 'OBS_WEBSOCKET_MEDIA_INPUT_ACTION_STOP' }); }
+  async replayBufferActive() { return (await this.obs.call('GetReplayBufferStatus')).outputActive; }
+  startReplayBuffer() { return this.obs.call('StartReplayBuffer'); }
+  stopReplayBuffer() { return this.obs.call('StopReplayBuffer'); }
   async status() {
     const [s, r] = await Promise.all([this.obs.call('GetStreamStatus'), this.obs.call('GetRecordStatus')]);
     return { streaming: s.outputActive, streamMs: s.outputDuration || 0, recording: r.outputActive, recordMs: r.outputDuration || 0 };
