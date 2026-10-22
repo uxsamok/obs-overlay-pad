@@ -20,15 +20,15 @@ function toast(msg, err) { const t = $('#toast'); t.textContent = msg; t.classNa
 obs.addEventListener('status', async (e) => {
   const st = e.detail.status; const el = $('#conn');
   el.className = 'conn ' + st; el.textContent = { connected: 'OBS ✓', connecting: 'OBS …', disconnected: 'OBS ✕', error: 'OBS ✕' }[st];
-  if (st === 'connected') { try { await act.rebuildIndex(); await poll(); setBuffer(await act.replayBufferActive()); } catch (err) { toast(err.message, true); } }
-  else setBuffer(null);
+  if (st === 'connected') { try { await act.rebuildIndex(); await poll(); setBuffer(await act.replayBufferActive()); refreshMic(); } catch (err) { toast(err.message, true); } }
+  else { setBuffer(null); setMic(null); }
   renderGrid();
 });
 for (const ev of ['SceneItemCreated', 'SceneItemRemoved', 'InputNameChanged', 'SceneCreated', 'SceneRemoved', 'SceneNameChanged'])
   obs.addEventListener(ev, () => { clearTimeout(act.rb); act.rb = setTimeout(() => act.rebuildIndex().then(renderGrid).catch(() => {}), 500); });
 obs.addEventListener('StreamStateChanged', (e) => { if (e.detail.outputState === 'OBS_WEBSOCKET_OUTPUT_STARTED') newStream(); poll(); });
 obs.addEventListener('RecordStateChanged', () => poll());
-obs.addEventListener('ReplayBufferSaved', (e) => { act.lastReplay = e.detail.savedReplayPath; toast('Повтор сохранён'); });
+obs.addEventListener('ReplayBufferSaved', (e) => { act.lastReplay = e.detail.savedReplayPath; toast('Повтор сохранён — «▶ Показать повтор» выведет его на экран'); });
 // Replay Buffer: индикатор на кнопке «Буфер»
 let bufferOn = null; // true / false / null (неизвестно — нет связи с OBS)
 function setBuffer(on) { bufferOn = on; const b = $('#btnBuffer'); b.classList.toggle('on', on === true); b.textContent = (on ? '● ' : '○ ') + 'Буфер'; }
@@ -36,10 +36,28 @@ obs.addEventListener('ReplayBufferStateChanged', (e) => setBuffer(e.detail.outpu
 // Повтор доиграл до конца — прячем Media Source и гасим подсветку ячеек повтора
 obs.addEventListener('MediaInputPlaybackEnded', (e) => {
   if (!S.replay.mediaSource || e.detail.inputName !== S.replay.mediaSource) return;
-  let had = false;
-  for (const [i, st] of [...active]) if (S.cells[i]?.type === 'replay') { clearTimeout(st.timer); active.delete(i); updateCell(i); had = true; }
-  if (had) act.hide(S.replay.mediaSource).catch(() => {});
+  if (replayShown()) stopReplay(false);
 });
+// Повтор на экране: кнопка «▶ Показать повтор» и/или ячейки «Последний повтор»
+let replayOn = false;
+const replayShown = () => replayOn || [...active.keys()].some((i) => S.cells[i]?.type === 'replay');
+function setPlayBtn() { const b = $('#btnPlay'); b.classList.toggle('on', replayOn); b.textContent = replayOn ? '■ Скрыть повтор' : '▶ Показать повтор'; }
+async function playReplay() {
+  if (!obs.identified) throw new Error('Нет соединения с OBS');
+  if (!S.replay.mediaSource) throw new Error('Укажите Media Source: Настройки → Повтор');
+  await act.playLastReplay(S.replay.mediaSource);
+}
+async function stopReplay(stopMedia = true) { // скрыть источник, остановить видео, погасить ячейки
+  replayOn = false; setPlayBtn();
+  for (const [i, st] of [...active]) if (S.cells[i]?.type === 'replay') { clearTimeout(st.timer); active.delete(i); updateCell(i); }
+  try { await act.hide(S.replay.mediaSource); } catch (err) { toast(err.message, true); }
+  if (stopMedia) act.stopMedia(S.replay.mediaSource).catch(() => {});
+}
+// Микрофон
+let micMuted = null; // true / false / null (не настроен или нет связи)
+function setMic(m) { micMuted = m; const b = $('#btnMic'); b.classList.toggle('alert', m === true); b.classList.toggle('dim', m == null); b.textContent = m === true ? '🔇 Мик ВЫКЛ' : '🎤 Мик'; }
+async function refreshMic() { if (!obs.identified || !S.mic.source) return setMic(null); try { setMic(await act.getMute(S.mic.source)); } catch { setMic(null); } }
+obs.addEventListener('InputMuteStateChanged', (e) => { if (e.detail.inputName === S.mic.source) setMic(e.detail.inputMuted); });
 obs.addEventListener('SceneItemEnableStateChanged', (e) => {
   // синхронизация подсветки переключателей, если оверлей выключили в самом OBS
   S.cells.forEach((c, i) => { if (c.type === 'overlay' && c.mode === 'toggle' && c.source) {
@@ -69,13 +87,14 @@ async function press(i, e) {
   const c = S.cells[i];
   try {
     if (c.type === 'counter') {
-      const r = e.currentTarget.getBoundingClientRect(); const dir = (e.clientX - r.left) < r.width / 2 ? -1 : 1;
+      const d = e.target?.closest?.('[data-d]'); if (!d) return; // меняют только кнопки − / +
+      const dir = +d.dataset.d;
       c.counterValue = (+c.counterValue || 0) + dir; persist(); updateCell(i);
       if (c.source) await act.setText(c.source, c.counterTemplate.replace('{n}', c.counterValue));
     } else if (c.type === 'replay') {
       if (!S.replay.mediaSource) throw new Error('Не указан Media Source для повтора в настройках');
-      if (active.has(i)) return stopCell(i);
-      await act.playLastReplay(S.replay.mediaSource); startActive(i, S.replay.mediaSource);
+      if (active.has(i) || replayOn) return stopReplay();
+      await playReplay(); startActive(i, S.replay.mediaSource);
     } else {
       if (!c.source) throw new Error('Не указан источник OBS для ячейки ' + (i + 1));
       if (active.has(i)) return stopCell(i);
@@ -87,15 +106,18 @@ async function press(i, e) {
 }
 function startActive(i, source) {
   const c = S.cells[i]; const st = { source };
-  if (c.mode === 'timer' || c.type === 'replay' && c.mode === 'timer') {
-    st.until = Date.now() + c.duration * 1000; st.timer = setTimeout(() => stopCell(i), c.duration * 1000);
+  if (c.mode === 'timer') {
+    const sec = +c.duration >= 0.5 ? +c.duration : 8; // пустое/0 -> 8 с
+    // по объекту ячейки, а не по номеру: номер может смениться при перестановке
+    st.until = Date.now() + sec * 1000; st.timer = setTimeout(() => stopCell(S.cells.indexOf(c)), sec * 1000);
   }
   active.set(i, st); updateCell(i);
 }
 async function stopCell(i) {
-  const st = active.get(i); if (!st) return; clearTimeout(st.timer); active.delete(i); updateCell(i);
+  const st = active.get(i); if (!st) return;
+  if (S.cells[i].type === 'replay') return stopReplay(); // скрыть + остановить видео
+  clearTimeout(st.timer); active.delete(i); updateCell(i);
   try { await act.hide(st.source || S.cells[i].source); } catch (err) { toast(err.message, true); }
-  if (S.cells[i].type === 'replay') act.stopMedia(st.source).catch(() => {}); // остановить видео, а не только скрыть
 }
 function startGameTimer() { gameTimer = { start: Date.now() }; }
 function tickGameTimer() {
@@ -108,7 +130,7 @@ function tickGameTimer() {
 function cellHTML(c, i) {
   const st = active.get(i); const warn = c.source && obs.identified && c.type !== 'replay' && (!act.index.has(c.source) ? '⚠ нет в OBS' : act.duplicates(c.source) ? '⚠ дубль имени' : '');
   let sub = '';
-  if (c.type === 'counter') sub = `<div class="ctr"><span>−</span><b>${esc(c.counterValue)}</b><span>+</span></div>`;
+  if (c.type === 'counter') sub = `<div class="ctr"><button class="cbtn" data-d="-1" aria-label="минус">−</button><b>${esc(c.counterValue)}</b><button class="cbtn" data-d="1" aria-label="плюс">+</button></div>`;
   if (st && st.until) sub += `<div class="cd">${Math.ceil((st.until - Date.now()) / 1000)}</div>`;
   else if (st) sub += `<div class="cd">В ЭФИРЕ</div>`;
   return `<div class="lbl">${esc(c.label)}</div>${sub}${warn ? `<div class="warn">${warn}</div>` : ''}<div class="num">${i + 1}</div>`;
@@ -127,17 +149,50 @@ function renderGrid() {
   g.innerHTML = h;
   $('#pages').innerHTML = pages > 1 ? Array.from({ length: pages }, (_, p) => `<button data-p="${p}">${p + 1}</button>`).join('') : '';
   $('#pages').style.display = pages > 1 ? '' : 'none';
+  document.body.classList.toggle('reorder', reorder);
 }
 // тап vs прокрутка: активация, только если палец сдвинулся < 10px
 let down = null;
-document.addEventListener('pointerdown', (e) => { const c = e.target.closest('.cell'); down = c ? { c, x: e.clientX, y: e.clientY, id: e.pointerId } : null; });
+// ---------- Перестановка ячеек (режим ⇅) ----------
+let reorder = false, drag = null;
+$('#btnReorder').onclick = () => { reorder = !reorder; $('#btnReorder').classList.toggle('on', reorder); renderGrid();
+  if (reorder) toast('Перестановка: перетащите ячейку на новое место. ⇅ — готово'); };
+function moveCell(i, j) { // ячейку i поставить на место j; подсветка/таймеры едут вместе с ячейкой
+  const byObj = new Map([...active].map(([k, v]) => [S.cells[k], v]));
+  const [c] = S.cells.splice(i, 1); S.cells.splice(j, 0, c);
+  active.clear(); S.cells.forEach((x, k) => { if (byObj.has(x)) active.set(k, byObj.get(x)); });
+  persist(); renderGrid();
+}
+function dropTarget(e) {
+  drag.el.style.visibility = 'hidden'; const t = document.elementFromPoint(e.clientX, e.clientY)?.closest('.cell'); drag.el.style.visibility = '';
+  return t;
+}
+document.addEventListener('pointerdown', (e) => {
+  if (!reorder) return; const c = e.target.closest('.cell'); if (!c) return;
+  e.preventDefault(); c.setPointerCapture(e.pointerId);
+  drag = { el: c, i: +c.dataset.i, x: e.clientX, y: e.clientY, id: e.pointerId, st: $('#grid').scrollTop }; c.classList.add('dragging');
+});
+document.addEventListener('pointermove', (e) => {
+  if (!drag || e.pointerId !== drag.id) return; const g = $('#grid'); const r = g.getBoundingClientRect();
+  if (e.clientY < r.top + 40) g.scrollTop -= 12; else if (e.clientY > r.bottom - 40) g.scrollTop += 12; // к другим страницам
+  drag.el.style.transform = `translate(${e.clientX - drag.x}px,${e.clientY - drag.y + g.scrollTop - drag.st}px)`;
+  document.querySelectorAll('.cell.drop').forEach((x) => x.classList.remove('drop'));
+  const t = dropTarget(e); if (t && t !== drag.el) t.classList.add('drop');
+});
+const endDrag = (e) => {
+  if (!drag || e.pointerId !== drag.id) return; const t = e.type === 'pointerup' ? dropTarget(e) : null; const i = drag.i;
+  drag.el.style.transform = ''; drag.el.classList.remove('dragging'); drag = null;
+  if (t && +t.dataset.i !== i) moveCell(i, +t.dataset.i); else renderGrid();
+};
+document.addEventListener('pointerup', endDrag); document.addEventListener('pointercancel', endDrag);
+document.addEventListener('pointerdown', (e) => { if (reorder) return; const c = e.target.closest('.cell'); down = c ? { c, x: e.clientX, y: e.clientY, id: e.pointerId } : null; });
 document.addEventListener('pointermove', (e) => { if (down && e.pointerId === down.id && Math.hypot(e.clientX - down.x, e.clientY - down.y) >= 10) down = null; });
 document.addEventListener('pointercancel', () => down = null);
 document.addEventListener('pointerup', (e) => {
-  if (!down || e.pointerId !== down.id) return; const c = down.c; down = null;
+  if (reorder || !down || e.pointerId !== down.id) return; const c = down.c; down = null;
   if (e.target.closest('.cell') !== c) return;
   c.classList.add('flash'); setTimeout(() => c.classList.remove('flash'), 150);
-  press(+c.dataset.i, { currentTarget: c, clientX: e.clientX });
+  press(+c.dataset.i, { currentTarget: c, target: e.target });
 });
 $('#pages').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) $(`.page[data-p="${b.dataset.p}"]`).scrollIntoView({ behavior: 'smooth' }); });
 $('#grid').addEventListener('scroll', () => {
@@ -156,13 +211,23 @@ $('#btnBuffer').onclick = async () => {
     else { await act.startReplayBuffer(); toast('Replay Buffer запущен'); }
   } catch (err) { toast(/604|not active|disabled|500/i.test(err.message) ? 'Не удалось: включите буфер повтора в настройках OBS (Вывод → Буфер повтора)' : err.message, true); }
 };
+$('#btnPlay').onclick = async () => {
+  try { if (replayOn || replayShown()) await stopReplay(); else { await playReplay(); replayOn = true; setPlayBtn(); } } catch (err) { toast(err.message, true); }
+};
+$('#btnMic').onclick = async () => {
+  if (!S.mic.source) return toast('Укажите микрофон: Настройки → Микрофон', true);
+  if (!obs.identified) return toast('Нет соединения с OBS', true);
+  try { setMic(await act.toggleMute(S.mic.source)); } catch (err) { toast(err.message, true); }
+};
 $('#gtimer').onclick = () => { if (gameTimer && confirm('Остановить таймер игры?')) { gameTimer = null; tickGameTimer(); } };
 
 setInterval(() => {
   $('#clock').textContent = new Date().toLocaleTimeString('ru-RU');
   const ind = $('#live'); const el = elapsed();
-  ind.className = 'live' + (live.streaming ? ' on' : '') + (live.recording && !live.streaming ? ' warn' : '');
-  ind.textContent = (live.streaming ? '● LIVE' : '○ OFF') + (live.recording ? ' · REC' : '');
+  // ЭФИР: мигает, только когда OBS на связи, а эфира НЕТ (не забыть запустить). REC — просто состояние.
+  ind.className = 'live' + (live.streaming ? ' on' : obs.identified ? ' warn' : '');
+  ind.textContent = live.streaming ? '● ЭФИР' : '○ НЕ В ЭФИРЕ';
+  const rec = $('#rec'); rec.className = 'rec' + (live.recording ? ' on' : ''); rec.textContent = (live.recording ? '● ' : '○ ') + 'REC';
   $('#elapsed').textContent = live.streaming ? fmt(el, true) : '';
   for (const [i, st] of active) if (st.until) updateCell(i);
   tickGameTimer();
@@ -179,39 +244,65 @@ window.addEventListener('hashchange', route);
 const typeOpts = [['overlay', 'Оверлей'], ['counter', 'Счётчик'], ['replay', 'Последний повтор']];
 const modeOpts = [['timer', 'По таймеру'], ['toggle', 'Переключатель']];
 const sel = (k, opts, v) => `<select data-k="${k}">${opts.map(([a, b]) => `<option value="${a}"${a === v ? ' selected' : ''}>${b}</option>`).join('')}</select>`;
+const SWATCHES = ['#2b3a55', '#3b5bdb', '#1971c2', '#0c8599', '#2b8a3e', '#5c940d', '#e67700', '#d9480f', '#c92a2a', '#a61e4d', '#862e9c', '#495057'];
+const box = (title, inner) => `<section class="box"><h3>${title}</h3>${inner}</section>`;
 function renderSettings() {
   const v = $('#v-settings');
   const names = [...act.index.keys()].sort();
   $('#srcList').innerHTML = names.map((n) => `<option value="${esc(n)}">`).join('');
-  v.querySelector('#g').innerHTML = `
-    <label>Хост OBS <input data-g="obs.host" value="${esc(S.obs.host)}"></label>
-    <label>Порт <input data-g="obs.port" type="number" value="${S.obs.port}"></label>
-    <label>Пароль <input data-g="obs.password" type="password" value="${esc(S.obs.password)}"></label>
-    <label>Колонок <input data-g="grid.cols" type="number" min="1" max="12" value="${S.grid.cols}"></label>
-    <label>Рядов на экране <input data-g="grid.rows" type="number" min="1" max="12" value="${S.grid.rows}"></label>
-    <label>Всего ячеек <input data-g="grid.total" type="number" min="1" max="500" value="${S.grid.total}"></label>
-    <label>Сцена с оверлеями («Скрыть всё») <input data-g="overlaysScene" value="${esc(S.overlaysScene)}" list="srcList"></label>
-    <label>Текст. источник таймера игры <input data-g="gameTimer.source" value="${esc(S.gameTimer.source)}" list="srcList"></label>
-    <label>Media Source для повтора <input data-g="replay.mediaSource" value="${esc(S.replay.mediaSource)}" list="srcList"></label>`;
+  if (obs.identified) act.audioInputs().then((l) => { $('#micList').innerHTML = l.map((n) => `<option value="${esc(n)}">`).join(''); }).catch(() => {});
+  v.querySelector('#g').innerHTML =
+    box('Подключение OBS', `<div class="gset">
+      <label>Хост OBS <input data-g="obs.host" value="${esc(S.obs.host)}"></label>
+      <label>Порт <input data-g="obs.port" type="number" value="${S.obs.port}"></label>
+      <label>Пароль <input data-g="obs.password" type="password" value="${esc(S.obs.password)}"></label></div>`) +
+    box('Сетка и оверлеи', `<div class="gset">
+      <label>Колонок <input data-g="grid.cols" type="number" min="1" max="12" value="${S.grid.cols}"></label>
+      <label>Рядов на экране <input data-g="grid.rows" type="number" min="1" max="12" value="${S.grid.rows}"></label>
+      <label>Всего ячеек <input data-g="grid.total" type="number" min="1" max="500" value="${S.grid.total}"></label>
+      <label>Сцена с оверлеями (для «Скрыть всё») <input data-g="overlaysScene" value="${esc(S.overlaysScene)}" list="srcList"></label></div>`) +
+    box('Повтор (Replay Buffer)', `<ol class="howto">
+      <li>В OBS: <b>Настройки → Вывод → Буфер повтора</b> — включить, «Максимальное время повтора» 30 с.</li>
+      <li>В сцену (удобно — в сцену с оверлеями) добавьте источник <b>«Медиа» (Media Source)</b>, например с именем <code>Replay</code>. В его свойствах снимите галочку <b>«Зациклить» (Loop)</b>. Скройте его (глаз).</li>
+      <li>Впишите имя этого источника в поле ниже.</li>
+      <li>Перед стримом нажмите <b>● Буфер</b> в шапке — кнопка станет зелёной.</li>
+      <li>После яркого момента — <b>⟲ Сохранить повтор</b>.</li>
+      <li><b>▶ Показать повтор</b> — видео появится на экране и скроется само, когда закончится (или нажмите кнопку ещё раз). Ячейка типа «Последний повтор» делает то же самое.</li></ol>
+      <div class="gset"><label>Media Source для повтора <input data-g="replay.mediaSource" value="${esc(S.replay.mediaSource)}" list="srcList" placeholder="Replay"></label></div>`) +
+    box('Таймер игры', `<div class="gset"><label>Текстовый источник таймера <input data-g="gameTimer.source" value="${esc(S.gameTimer.source)}" list="srcList"></label></div>
+      <p class="hint">Перезапускать таймер при нажатии на ячейки:</p>
+      <div class="chk">${S.cells.map((c, i) => `<label><input type="checkbox" data-gt="${i}"${c.startGameTimer ? ' checked' : ''}> ${i + 1}. ${esc(c.label)}</label>`).join('')}</div>`) +
+    box('Микрофон', `<div class="gset"><label>Аудиовход OBS для кнопки «🎤 Мик» <input data-g="mic.source" value="${esc(S.mic.source)}" list="micList" placeholder="Mic/Aux"></label></div>`);
   v.querySelector('tbody').innerHTML = S.cells.map((c, i) => `<tr data-i="${i}">
     <td>${i + 1}</td><td><input data-k="label" value="${esc(c.label)}"></td>
-    <td><input data-k="color" type="color" value="${esc(c.color)}"></td>
+    <td><div class="sw">${SWATCHES.map((h) => `<button type="button" data-sw="${h}" style="background:${h}"${h === c.color ? ' class="cur"' : ''} aria-label="${h}"></button>`).join('')}</div>
+      <input data-k="color" class="hex" value="${esc(c.color)}" style="border-left:14px solid ${esc(c.color)}" maxlength="9"></td>
     <td>${sel('type', typeOpts, c.type)}</td>
-    <td><input data-k="source" value="${esc(c.source)}" list="srcList" placeholder="${c.type === 'counter' ? 'Текстовый источник' : c.type === 'replay' ? '(из общих настроек)' : 'Имя источника'}"></td>
-    <td>${c.type === 'counter' ? `<input data-k="counterTemplate" value="${esc(c.counterTemplate)}" title="Шаблон, {n} — число">` : sel('mode', modeOpts, c.mode)}</td>
-    <td><input data-k="duration" type="number" min="0.5" step="0.5" value="${c.duration}"></td>
-    <td><input data-k="outDuration" type="number" min="0" step="0.1" value="${c.outDuration}"></td>
-    <td><input data-k="timecode" type="checkbox"${c.timecode ? ' checked' : ''}></td>
-    <td><input data-k="startGameTimer" type="checkbox"${c.startGameTimer ? ' checked' : ''}></td></tr>`).join('');
+    <td><input data-k="source" value="${esc(c.source)}" list="srcList" placeholder="${c.type === 'counter' ? 'Текстовый источник' : c.type === 'replay' ? '(из раздела «Повтор»)' : 'Имя источника'}"></td>
+    <td>${c.type === 'counter' ? `<input data-k="counterTemplate" value="${esc(c.counterTemplate)}" title="Шаблон, {n} — число"> № <input data-k="counterValue" type="number" value="${esc(c.counterValue)}">` : sel('mode', modeOpts, c.mode)}</td>
+    <td>${c.type === 'counter' ? '' : `<input data-k="duration" type="number" min="0.5" step="0.5" value="${c.duration}">`}</td>
+    <td><input data-k="timecode" type="checkbox"${c.timecode ? ' checked' : ''}></td></tr>`).join('');
 }
+$('#v-settings').addEventListener('click', (e) => { // палитра цветов
+  const b = e.target.closest('[data-sw]'); if (!b) return; const i = +b.closest('tr').dataset.i;
+  S.cells[i].color = b.dataset.sw; persist(); renderSettings();
+});
 $('#v-settings').addEventListener('change', (e) => {
-  const t = e.target; const val = t.type === 'checkbox' ? t.checked : t.type === 'number' ? +t.value : t.value;
+  const t = e.target; let val = t.type === 'checkbox' ? t.checked : t.type === 'number' ? +t.value : t.value;
+  if (t.dataset.gt) { S.cells[+t.dataset.gt].startGameTimer = val; persist(); return; }
   if (t.dataset.g) {
     const [a, b] = t.dataset.g.split('.'); if (b) S[a][b] = val; else S[a] = val;
     if (a === 'grid') resizeCells(S);
     if (a === 'obs') connect();
-  } else if (t.dataset.k) { const i = +t.closest('tr').dataset.i; S.cells[i][t.dataset.k] = val; }
-  persist(); if (t.dataset.k === 'type' || t.dataset.g?.startsWith('grid')) renderSettings();
+    if (a === 'mic') refreshMic();
+  } else if (t.dataset.k) {
+    const i = +t.closest('tr').dataset.i; const k = t.dataset.k;
+    if (k === 'color') { val = val.trim(); if (!val.startsWith('#')) val = '#' + val; if (!/^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(val)) { toast('Цвет: формат #RRGGBB, например #3b5bdb', true); renderSettings(); return; } }
+    if (k === 'duration' && !(val >= 0.5)) { val = 8; toast('Длительность: минимум 0,5 с — поставлено 8 с'); }
+    S.cells[i][k] = val;
+    if (k === 'counterValue' && S.cells[i].source && obs.identified) act.setText(S.cells[i].source, S.cells[i].counterTemplate.replace('{n}', val)).catch((err) => toast(err.message, true));
+  }
+  persist(); if (['type', 'label', 'color', 'duration'].includes(t.dataset.k) || t.dataset.g?.startsWith('grid')) renderSettings();
 });
 $('#btnExport').onclick = () => {
   const blob = new Blob([JSON.stringify(S, null, 2)], { type: 'application/json' }); const a = document.createElement('a');
@@ -219,10 +310,10 @@ $('#btnExport').onclick = () => {
 };
 $('#fileImport').onchange = async (e) => {
   const f = e.target.files[0]; if (!f) return;
-  try { S = normalize(JSON.parse(await f.text())); persist(); connect(); renderSettings(); toast('Настройки загружены'); } catch (err) { toast('Ошибка файла: ' + err.message, true); }
+  try { S = normalize(JSON.parse(await f.text())); active.clear(); persist(); connect(); renderSettings(); toast('Настройки загружены'); } catch (err) { toast('Ошибка файла: ' + err.message, true); }
   e.target.value = '';
 };
-$('#btnReset').onclick = () => { if (confirm('Сбросить все настройки?')) { S = defaultState(); persist(); renderSettings(); } };
+$('#btnReset').onclick = () => { if (confirm('Сбросить все настройки?')) { S = defaultState(); active.clear(); persist(); renderSettings(); location.hash = '#settings'; window.scrollTo(0, 0); } };
 $('#btnRescan').onclick = () => act.rebuildIndex().then(() => { renderSettings(); toast(`Найдено источников: ${act.index.size}`); }).catch((e) => toast(e.message, true));
 
 function renderTimecodes() {

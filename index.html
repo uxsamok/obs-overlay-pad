@@ -5,30 +5,43 @@
 <link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icons/icon.svg"><link rel="stylesheet" href="css/styles.css">
 </head><body>
 <div id="v-main" class="view">
-  <header>
-    <span id="conn" class="conn">OBS …</span>
-    <span id="live" class="live">○ OFF</span><span id="elapsed"></span>
-    <span id="gtimer" class="gtimer"></span>
+  <header class="mainhdr">
+    <div class="stat">
+      <span id="conn" class="conn">OBS …</span>
+      <span id="live" class="live">○ НЕ В ЭФИРЕ</span><span id="rec" class="rec">○ REC</span><span id="elapsed"></span>
+      <span id="gtimer" class="gtimer"></span><span id="clock" class="clock"></span>
+    </div>
     <span class="sp"></span>
-    <button id="btnMark">★ Момент</button>
-    <button id="btnBuffer" class="rbuf">○ Буфер</button>
-    <button id="btnReplay">⟲ Сохранить повтор</button>
-    <button id="btnHide">Скрыть всё</button>
-    <a class="btn" href="#timecodes">Таймкоды</a>
-    <span id="clock" class="clock"></span>
-    <a class="btn" href="#settings" aria-label="Настройки">⚙</a>
+    <!-- главные кнопки во время эфира: крупные, отдельно от второстепенных -->
+    <div class="prim">
+      <button id="btnMark">★ Момент</button>
+      <button id="btnReplay">⟲ Сохранить повтор</button>
+      <button id="btnPlay">▶ Показать повтор</button>
+      <button id="btnMic" class="dim">🎤 Мик</button>
+    </div>
+    <div class="sec">
+      <button id="btnBuffer" class="rbuf">○ Буфер</button>
+      <button id="btnHide">Скрыть всё</button>
+      <a class="btn" href="#timecodes">Таймкоды</a>
+      <a class="btn" href="#settings" aria-label="Настройки">⚙</a>
+    </div>
   </header>
-  <main><div id="grid"></div><nav id="pages"></nav></main>
+  <main><div id="grid"></div><div class="side"><nav id="pages"></nav><span class="sp"></span><button id="btnReorder" title="Переставить ячейки">⇅</button></div></main>
 </div>
 <div id="v-settings" class="view page-scroll" hidden>
   <header><a class="btn" href="#main">← Назад</a><h2>Настройки</h2><span class="sp"></span>
-    <button id="btnRescan">Обновить список из OBS</button>
+    <button id="btnRescan">Обновить список из OBS</button></header>
+  <div id="g"></div>
+  <datalist id="srcList"></datalist><datalist id="micList"></datalist>
+  <section class="box"><h3>Ячейки</h3>
+    <p class="hint">Порядок ячеек меняется на главном экране кнопкой ⇅ (справа внизу).</p>
+    <div class="tblwrap"><table><thead><tr><th>№</th><th>Текст</th><th>Цвет</th><th>Тип</th><th>Источник OBS</th><th>Режим / шаблон</th><th>Длит., с</th><th>Таймкод</th></tr></thead><tbody></tbody></table></div>
+  </section>
+  <section class="box"><h3>Резервная копия</h3>
     <button id="btnExport">Сохранить JSON</button>
     <label class="btn">Загрузить JSON<input id="fileImport" type="file" accept="application/json,.json" hidden></label>
-    <button id="btnReset" class="danger">Сброс</button></header>
-  <div id="g" class="gset"></div>
-  <datalist id="srcList"></datalist>
-  <div class="tblwrap"><table><thead><tr><th>№</th><th>Текст</th><th>Цвет</th><th>Тип</th><th>Источник OBS</th><th>Режим / шаблон</th><th>Длит., с</th><th>Out, с</th><th>Таймкод</th><th>Таймер игры</th></tr></thead><tbody></tbody></table></div>
+  </section>
+  <section class="box"><h3>Сброс</h3><button id="btnReset" class="danger">Сбросить все настройки</button></section>
 </div>
 <div id="v-timecodes" class="view page-scroll" hidden>
   <header><a class="btn" href="#main">← Назад</a><h2>Таймкоды</h2><span class="sp"></span><button id="btnNewStream">Новый стрим</button></header>

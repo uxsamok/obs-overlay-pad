@@ -58,6 +58,13 @@ export class Actions extends EventTarget {
   async replayBufferActive() { return (await this.obs.call('GetReplayBufferStatus')).outputActive; }
   startReplayBuffer() { return this.obs.call('StartReplayBuffer'); }
   stopReplayBuffer() { return this.obs.call('StopReplayBuffer'); }
+  async getMute(input) { return (await this.obs.call('GetInputMute', { inputName: input })).inputMuted; }
+  async toggleMute(input) { return (await this.obs.call('ToggleInputMute', { inputName: input })).inputMuted; }
+  async audioInputs() { // имена аудиовходов для подсказки в настройках
+    const { inputs } = await this.obs.call('GetInputList');
+    const audio = inputs.filter((x) => /audio|wasapi|pulse|alsa|coreaudio|jack|sndio|oss/i.test(x.unversionedInputKind || x.inputKind || ''));
+    return (audio.length ? audio : inputs).map((x) => x.inputName).sort();
+  }
   async status() {
     const [s, r] = await Promise.all([this.obs.call('GetStreamStatus'), this.obs.call('GetRecordStatus')]);
     return { streaming: s.outputActive, streamMs: s.outputDuration || 0, recording: r.outputActive, recordMs: r.outputDuration || 0 };
