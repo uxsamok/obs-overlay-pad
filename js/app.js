@@ -1,5 +1,6 @@
 import { ObsClient } from './obs.js';
 import { Actions } from './actions.js';
+import { openColorPicker } from './colorpicker.js';
 import { load, save, normalize, resizeCells, defaultState } from './store.js';
 
 let S = load();
@@ -20,7 +21,7 @@ function toast(msg, err) { const t = $('#toast'); t.textContent = msg; t.classNa
 obs.addEventListener('status', async (e) => {
   const st = e.detail.status; const el = $('#conn');
   el.className = 'conn ' + st; el.textContent = { connected: 'OBS ✓', connecting: 'OBS …', disconnected: 'OBS ✕', error: 'OBS ✕' }[st];
-  if (st === 'connected') { try { await act.rebuildIndex(); await poll(); setBuffer(await act.replayBufferActive()); refreshMic(); } catch (err) { toast(err.message, true); } }
+  if (st === 'connected') { renderSettings.mic = null; try { await act.rebuildIndex(); await poll(); await ensureBuffer(); refreshMic(); pushMatch(); } catch (err) { toast(err.message, true); } }
   else { setBuffer(null); setMic(null); }
   renderGrid();
 });
@@ -28,11 +29,32 @@ for (const ev of ['SceneItemCreated', 'SceneItemRemoved', 'InputNameChanged', 'S
   obs.addEventListener(ev, () => { clearTimeout(act.rb); act.rb = setTimeout(() => act.rebuildIndex().then(renderGrid).catch(() => {}), 500); });
 obs.addEventListener('StreamStateChanged', (e) => { if (e.detail.outputState === 'OBS_WEBSOCKET_OUTPUT_STARTED') newStream(); poll(); });
 obs.addEventListener('RecordStateChanged', () => poll());
-obs.addEventListener('ReplayBufferSaved', (e) => { act.lastReplay = e.detail.savedReplayPath; toast('Повтор сохранён — «▶ Показать повтор» выведет его на экран'); });
+obs.addEventListener('ReplayBufferSaved', (e) => {
+  act.lastReplay = e.detail.savedReplayPath; savePending = null; saveWaiters.splice(0).forEach((f) => f());
+  toast('Повтор сохранён — «▶ Показать повтор» выведет его на экран');
+});
+// Сохранение асинхронное: файл появляется через секунду-две (событие ReplayBufferSaved).
+// «Показать» сразу после «Сохранить» ждёт это событие (до 6 с), чтобы не показать старый файл.
+let savePending = null; const saveWaiters = [];
+const waitSave = () => !savePending || Date.now() - savePending > 6000 ? Promise.resolve()
+  : new Promise((res) => { saveWaiters.push(res); setTimeout(res, 6000 - (Date.now() - savePending)); });
 // Replay Buffer: индикатор на кнопке «Буфер»
+// Буфер повтора запускается автоматически: при подключении к OBS и если он остановился.
+// В шапке — только маленький индикатор (тап по нему = попробовать запустить ещё раз).
 let bufferOn = null; // true / false / null (неизвестно — нет связи с OBS)
-function setBuffer(on) { bufferOn = on; const b = $('#btnBuffer'); b.classList.toggle('on', on === true); b.textContent = (on ? '● ' : '○ ') + 'Буфер'; }
-obs.addEventListener('ReplayBufferStateChanged', (e) => setBuffer(e.detail.outputActive));
+function setBuffer(on, why) { bufferOn = on; const b = $('#buf'); b.className = 'buf' + (on ? ' on' : on === false ? ' off' : '');
+  b.textContent = on ? '● Буфер' : on === false ? '✕ Буфер' : '○ Буфер'; b.title = why || ''; }
+async function ensureBuffer(quiet) {
+  if (!obs.identified) return setBuffer(null);
+  try {
+    if (await act.replayBufferActive()) return setBuffer(true);
+    await act.startReplayBuffer(); setBuffer(true); if (!quiet) toast('Буфер повтора запущен');
+  } catch (err) { setBuffer(false, err.message); toast('Буфер повтора не запускается: включите его в OBS (Настройки → Вывод → Буфер повтора)', true); }
+}
+obs.addEventListener('ReplayBufferStateChanged', (e) => {
+  const st = e.detail.outputState; setBuffer(e.detail.outputActive);
+  if (st === 'OBS_WEBSOCKET_OUTPUT_STOPPED') setTimeout(() => ensureBuffer(), 3000); // кто-то/что-то остановил — запускаем снова
+});
 // Повтор доиграл до конца — прячем Media Source и гасим подсветку ячеек повтора
 obs.addEventListener('MediaInputPlaybackEnded', (e) => {
   if (!S.replay.mediaSource || e.detail.inputName !== S.replay.mediaSource) return;
@@ -45,6 +67,7 @@ function setPlayBtn() { const b = $('#btnPlay'); b.classList.toggle('on', replay
 async function playReplay() {
   if (!obs.identified) throw new Error('Нет соединения с OBS');
   if (!S.replay.mediaSource) throw new Error('Укажите Media Source: Настройки → Повтор');
+  await waitSave();
   await act.playLastReplay(S.replay.mediaSource);
 }
 async function stopReplay(stopMedia = true) { // скрыть источник, остановить видео, погасить ячейки
@@ -53,6 +76,13 @@ async function stopReplay(stopMedia = true) { // скрыть источник, 
   try { await act.hide(S.replay.mediaSource); } catch (err) { toast(err.message, true); }
   if (stopMedia) act.stopMedia(S.replay.mediaSource).catch(() => {});
 }
+// Номер матча (− N + в шапке): пишет текст по шаблону в текстовый источник OBS
+function renderMatch() { $('#matchN').textContent = S.match.template.replace('{n}', S.match.value); }
+function pushMatch() { renderMatch(); if (S.match.source && obs.identified) act.setText(S.match.source, S.match.template.replace('{n}', S.match.value)).catch((err) => toast(err.message, true)); }
+document.querySelectorAll('#match [data-md]').forEach((b) => b.onclick = () => {
+  S.match.value = Math.max(0, (+S.match.value || 0) + +b.dataset.md); persist(); pushMatch();
+  if (!S.match.source) toast('Чтобы номер появился в OBS — Настройки → Номер матча', true);
+});
 // Микрофон
 let micMuted = null; // true / false / null (не настроен или нет связи)
 function setMic(m) { micMuted = m; const b = $('#btnMic'); b.classList.toggle('alert', m === true); b.classList.toggle('dim', m == null); b.textContent = m === true ? '🔇 Мик ВЫКЛ' : '🎤 Мик'; }
@@ -163,26 +193,35 @@ function moveCell(i, j) { // ячейку i поставить на место j
   active.clear(); S.cells.forEach((x, k) => { if (byObj.has(x)) active.set(k, byObj.get(x)); });
   persist(); renderGrid();
 }
-function dropTarget(e) {
-  drag.el.style.visibility = 'hidden'; const t = document.elementFromPoint(e.clientX, e.clientY)?.closest('.cell'); drag.el.style.visibility = '';
-  return t;
+// Живая перестановка: при перетаскивании остальные ячейки плавно сдвигаются (transform),
+// показывая будущий порядок; отпустили — порядок сохраняется.
+function slotAt(x, y) { // номер места под пальцем (координаты места — снятые в начале перетаскивания)
+  const dy = $('#grid').scrollTop - drag.st;
+  return drag.rects.findIndex((r) => x >= r.left && x <= r.right && y + dy >= r.top && y + dy <= r.bottom);
+}
+function preview(j) {
+  if (j === drag.j) return; drag.j = j;
+  const order = drag.rects.map((_, k) => k).filter((k) => k !== drag.i); order.splice(j, 0, drag.i);
+  drag.cells.forEach((el, k) => { if (k === drag.i) return; const p = order.indexOf(k); const a = drag.rects[k], b = drag.rects[p];
+    el.style.transform = p === k ? '' : `translate(${b.left - a.left}px,${b.top - a.top}px)`; });
 }
 document.addEventListener('pointerdown', (e) => {
   if (!reorder) return; const c = e.target.closest('.cell'); if (!c) return;
   e.preventDefault(); c.setPointerCapture(e.pointerId);
-  drag = { el: c, i: +c.dataset.i, x: e.clientX, y: e.clientY, id: e.pointerId, st: $('#grid').scrollTop }; c.classList.add('dragging');
+  const cells = [...document.querySelectorAll('#grid .cell')];
+  drag = { el: c, i: +c.dataset.i, j: +c.dataset.i, x: e.clientX, y: e.clientY, id: e.pointerId, st: $('#grid').scrollTop, cells, rects: cells.map((x) => x.getBoundingClientRect()) };
+  c.classList.add('dragging');
 });
 document.addEventListener('pointermove', (e) => {
   if (!drag || e.pointerId !== drag.id) return; const g = $('#grid'); const r = g.getBoundingClientRect();
   if (e.clientY < r.top + 40) g.scrollTop -= 12; else if (e.clientY > r.bottom - 40) g.scrollTop += 12; // к другим страницам
   drag.el.style.transform = `translate(${e.clientX - drag.x}px,${e.clientY - drag.y + g.scrollTop - drag.st}px)`;
-  document.querySelectorAll('.cell.drop').forEach((x) => x.classList.remove('drop'));
-  const t = dropTarget(e); if (t && t !== drag.el) t.classList.add('drop');
+  const j = slotAt(e.clientX, e.clientY); if (j >= 0) preview(j);
 });
 const endDrag = (e) => {
-  if (!drag || e.pointerId !== drag.id) return; const t = e.type === 'pointerup' ? dropTarget(e) : null; const i = drag.i;
-  drag.el.style.transform = ''; drag.el.classList.remove('dragging'); drag = null;
-  if (t && +t.dataset.i !== i) moveCell(i, +t.dataset.i); else renderGrid();
+  if (!drag || e.pointerId !== drag.id) return; const { i, j } = drag; const ok = e.type === 'pointerup';
+  drag.cells.forEach((el) => { el.style.transform = ''; }); drag.el.classList.remove('dragging'); drag = null;
+  if (ok && j !== i) moveCell(i, j); else renderGrid();
 };
 document.addEventListener('pointerup', endDrag); document.addEventListener('pointercancel', endDrag);
 document.addEventListener('pointerdown', (e) => { if (reorder) return; const c = e.target.closest('.cell'); down = c ? { c, x: e.clientX, y: e.clientY, id: e.pointerId } : null; });
@@ -203,14 +242,18 @@ $('#grid').addEventListener('scroll', () => {
 $('#btnMark').onclick = () => { const n = curStream().marks.filter((m) => m.label.startsWith('Момент')).length + 1; addMark('Момент ' + n); };
 $('#btnHide').onclick = async () => { try { const on = await act.toggleOverlaysScene(); $('#btnHide').classList.toggle('alert', !on); toast(on ? 'Оверлеи показаны' : 'Все оверлеи скрыты');
   if (!on) for (const i of [...active.keys()]) { clearTimeout(active.get(i).timer); } } catch (err) { toast(err.message, true); } };
-$('#btnReplay').onclick = () => act.saveReplay().catch((err) => toast(err.message.includes('604') || /not active/i.test(err.message) ? 'Replay Buffer не запущен в OBS' : err.message, true));
-$('#btnBuffer').onclick = async () => {
-  if (!obs.identified) { toast('Нет соединения с OBS', true); return; }
-  try {
-    if (bufferOn) { if (!confirm('Остановить Replay Buffer? Несохранённый повтор пропадёт.')) return; await act.stopReplayBuffer(); toast('Replay Buffer остановлен'); }
-    else { await act.startReplayBuffer(); toast('Replay Buffer запущен'); }
-  } catch (err) { toast(/604|not active|disabled|500/i.test(err.message) ? 'Не удалось: включите буфер повтора в настройках OBS (Вывод → Буфер повтора)' : err.message, true); }
+$('#btnReplay').onclick = async () => {
+  if (!obs.identified) return toast('Нет соединения с OBS', true);
+  try { savePending = Date.now(); await act.saveReplay(); }
+  catch (err) {
+    savePending = null;
+    if (!(await act.replayBufferActive().catch(() => true))) { // буфер был выключен — запускаем
+      await ensureBuffer(true);
+      if (bufferOn) toast('Буфер был выключен — запустил. Этот момент не записан, следующий сохранится', true);
+    } else toast(err.message, true);
+  }
 };
+$('#buf').onclick = () => obs.identified ? ensureBuffer() : toast('Нет соединения с OBS', true);
 $('#btnPlay').onclick = async () => {
   try { if (replayOn || replayShown()) await stopReplay(); else { await playReplay(); replayOn = true; setPlayBtn(); } } catch (err) { toast(err.message, true); }
 };
@@ -224,8 +267,7 @@ $('#gtimer').onclick = () => { if (gameTimer && confirm('Остановить т
 setInterval(() => {
   $('#clock').textContent = new Date().toLocaleTimeString('ru-RU');
   const ind = $('#live'); const el = elapsed();
-  // ЭФИР: мигает, только когда OBS на связи, а эфира НЕТ (не забыть запустить). REC — просто состояние.
-  ind.className = 'live' + (live.streaming ? ' on' : obs.identified ? ' warn' : '');
+  ind.className = 'live' + (live.streaming ? ' on' : '');
   ind.textContent = live.streaming ? '● ЭФИР' : '○ НЕ В ЭФИРЕ';
   const rec = $('#rec'); rec.className = 'rec' + (live.recording ? ' on' : ''); rec.textContent = (live.recording ? '● ' : '○ ') + 'REC';
   $('#elapsed').textContent = live.streaming ? fmt(el, true) : '';
@@ -244,13 +286,11 @@ window.addEventListener('hashchange', route);
 const typeOpts = [['overlay', 'Оверлей'], ['counter', 'Счётчик'], ['replay', 'Последний повтор']];
 const modeOpts = [['timer', 'По таймеру'], ['toggle', 'Переключатель']];
 const sel = (k, opts, v) => `<select data-k="${k}">${opts.map(([a, b]) => `<option value="${a}"${a === v ? ' selected' : ''}>${b}</option>`).join('')}</select>`;
-const SWATCHES = ['#2b3a55', '#3b5bdb', '#1971c2', '#0c8599', '#2b8a3e', '#5c940d', '#e67700', '#d9480f', '#c92a2a', '#a61e4d', '#862e9c', '#495057'];
 const box = (title, inner) => `<section class="box"><h3>${title}</h3>${inner}</section>`;
 function renderSettings() {
   const v = $('#v-settings');
-  const names = [...act.index.keys()].sort();
-  $('#srcList').innerHTML = names.map((n) => `<option value="${esc(n)}">`).join('');
-  if (obs.identified) act.audioInputs().then((l) => { $('#micList').innerHTML = l.map((n) => `<option value="${esc(n)}">`).join(''); }).catch(() => {});
+  const items = [...act.index.keys()].sort((a, b) => a.localeCompare(b)); // всё, что стоит в сценах
+  if (obs.identified && !renderSettings.mic) act.audioInputs().then((l) => { renderSettings.mic = l; renderSettings(); }).catch(() => {});
   v.querySelector('#g').innerHTML =
     box('Подключение OBS', `<div class="gset">
       <label>Хост OBS <input data-g="obs.host" value="${esc(S.obs.host)}"></label>
@@ -260,49 +300,56 @@ function renderSettings() {
       <label>Колонок <input data-g="grid.cols" type="number" min="1" max="12" value="${S.grid.cols}"></label>
       <label>Рядов на экране <input data-g="grid.rows" type="number" min="1" max="12" value="${S.grid.rows}"></label>
       <label>Всего ячеек <input data-g="grid.total" type="number" min="1" max="500" value="${S.grid.total}"></label>
-      <label>Сцена с оверлеями (для «Скрыть всё») <input data-g="overlaysScene" value="${esc(S.overlaysScene)}" list="srcList"></label></div>`) +
-    box('Повтор (Replay Buffer)', `<ol class="howto">
-      <li>В OBS: <b>Настройки → Вывод → Буфер повтора</b> — включить, «Максимальное время повтора» 30 с.</li>
-      <li>В сцену (удобно — в сцену с оверлеями) добавьте источник <b>«Медиа» (Media Source)</b>, например с именем <code>Replay</code>. В его свойствах снимите галочку <b>«Зациклить» (Loop)</b>. Скройте его (глаз).</li>
-      <li>Впишите имя этого источника в поле ниже.</li>
-      <li>Перед стримом нажмите <b>● Буфер</b> в шапке — кнопка станет зелёной.</li>
-      <li>После яркого момента — <b>⟲ Сохранить повтор</b>.</li>
-      <li><b>▶ Показать повтор</b> — видео появится на экране и скроется само, когда закончится (или нажмите кнопку ещё раз). Ячейка типа «Последний повтор» делает то же самое.</li></ol>
-      <div class="gset"><label>Media Source для повтора <input data-g="replay.mediaSource" value="${esc(S.replay.mediaSource)}" list="srcList" placeholder="Replay"></label></div>`) +
-    box('Таймер игры', `<div class="gset"><label>Текстовый источник таймера <input data-g="gameTimer.source" value="${esc(S.gameTimer.source)}" list="srcList"></label></div>
+      <label>Сцена с оверлеями (для «Скрыть всё») ${pick('data-g="overlaysScene"', S.overlaysScene, act.scenes)}</label></div>`) +
+    box('Повтор (Replay Buffer)', `<p class="hint">Буфер повтора запускается сам. Нужен Media Source в сцене, скрытый, без «Зациклить». <details><summary>Подробнее</summary>OBS: Настройки → Вывод → Буфер повтора — включить, 30 с. Добавьте «Медиа» (Media Source), снимите «Зациклить», скройте, выберите его ниже. Дальше: «⟲ Сохранить повтор» → «▶ Показать повтор».</details></p>
+      <div class="gset"><label>Media Source для повтора ${pick('data-g="replay.mediaSource"', S.replay.mediaSource, act.inputs)}</label></div>`) +
+    box('Таймер игры', `<div class="gset"><label>Текстовый источник таймера ${pick('data-g="gameTimer.source"', S.gameTimer.source, act.inputs)}</label></div>
       <p class="hint">Перезапускать таймер при нажатии на ячейки:</p>
       <div class="chk">${S.cells.map((c, i) => `<label><input type="checkbox" data-gt="${i}"${c.startGameTimer ? ' checked' : ''}> ${i + 1}. ${esc(c.label)}</label>`).join('')}</div>`) +
-    box('Микрофон', `<div class="gset"><label>Аудиовход OBS для кнопки «🎤 Мик» <input data-g="mic.source" value="${esc(S.mic.source)}" list="micList" placeholder="Mic/Aux"></label></div>`);
+    box('Номер матча', `<p class="hint">Кнопки − / + в шапке меняют номер и пишут текст в OBS.</p><div class="gset">
+      <label>Текстовый источник ${pick('data-g="match.source"', S.match.source, act.inputs)}</label>
+      <label>Шаблон ({n} — номер) <input data-g="match.template" value="${esc(S.match.template)}"></label>
+      <label>Текущий номер <input data-g="match.value" type="number" min="0" value="${S.match.value}"></label></div>`) +
+    box('Микрофон', `<div class="gset"><label>Аудиовход OBS для кнопки «🎤 Мик» ${pick('data-g="mic.source"', S.mic.source, renderSettings.mic || act.inputs)}</label></div>`);
   v.querySelector('tbody').innerHTML = S.cells.map((c, i) => `<tr data-i="${i}">
     <td>${i + 1}</td><td><input data-k="label" value="${esc(c.label)}"></td>
-    <td><div class="sw">${SWATCHES.map((h) => `<button type="button" data-sw="${h}" style="background:${h}"${h === c.color ? ' class="cur"' : ''} aria-label="${h}"></button>`).join('')}</div>
-      <input data-k="color" class="hex" value="${esc(c.color)}" style="border-left:14px solid ${esc(c.color)}" maxlength="9"></td>
+    <td><button type="button" class="swbtn" data-color="${i}" style="background:${esc(c.color)}" aria-label="Цвет ${esc(c.color)}"></button></td>
     <td>${sel('type', typeOpts, c.type)}</td>
-    <td><input data-k="source" value="${esc(c.source)}" list="srcList" placeholder="${c.type === 'counter' ? 'Текстовый источник' : c.type === 'replay' ? '(из раздела «Повтор»)' : 'Имя источника'}"></td>
+    <td>${c.type === 'replay' ? '<span class="hint">из раздела «Повтор»</span>' : pick('data-k="source"', c.source, c.type === 'counter' ? act.inputs : items)}</td>
     <td>${c.type === 'counter' ? `<input data-k="counterTemplate" value="${esc(c.counterTemplate)}" title="Шаблон, {n} — число"> № <input data-k="counterValue" type="number" value="${esc(c.counterValue)}">` : sel('mode', modeOpts, c.mode)}</td>
     <td>${c.type === 'counter' ? '' : `<input data-k="duration" type="number" min="0.5" step="0.5" value="${c.duration}">`}</td>
     <td><input data-k="timecode" type="checkbox"${c.timecode ? ' checked' : ''}></td></tr>`).join('');
 }
-$('#v-settings').addEventListener('click', (e) => { // палитра цветов
-  const b = e.target.closest('[data-sw]'); if (!b) return; const i = +b.closest('tr').dataset.i;
-  S.cells[i].color = b.dataset.sw; persist(); renderSettings();
+// Выбор источника: обычный <select> со ВСЕМИ вариантами из OBS (у <datalist> Chrome прячет
+// варианты, не содержащие уже введённый текст). Плюс текущее значение и ручной ввод.
+function pick(attr, val, list) {
+  const opts = [...new Set(list || [])];
+  return `<select ${attr} class="pick"><option value="">— не выбрано —</option>
+    ${val && !opts.includes(val) ? `<option value="${esc(val)}" selected>${esc(val)}${obs.identified ? ' (нет в OBS)' : ''}</option>` : ''}
+    ${opts.map((n) => `<option value="${esc(n)}"${n === val ? ' selected' : ''}>${esc(n)}</option>`).join('')}
+    <option value="__manual">✎ Ввести имя вручную…</option></select>`;
+}
+$('#v-settings').addEventListener('click', (e) => { // цвет ячейки -> всплывающий выбор
+  const b = e.target.closest('[data-color]'); if (!b) return; const i = +b.dataset.color;
+  openColorPicker(S.cells[i].color, (hex) => { S.cells[i].color = hex; persist(); renderSettings(); });
 });
 $('#v-settings').addEventListener('change', (e) => {
   const t = e.target; let val = t.type === 'checkbox' ? t.checked : t.type === 'number' ? +t.value : t.value;
+  if (val === '__manual') { const v = prompt('Имя в OBS (точно как в OBS):'); if (v == null) { renderSettings(); return; } val = v.trim(); }
   if (t.dataset.gt) { S.cells[+t.dataset.gt].startGameTimer = val; persist(); return; }
   if (t.dataset.g) {
     const [a, b] = t.dataset.g.split('.'); if (b) S[a][b] = val; else S[a] = val;
     if (a === 'grid') resizeCells(S);
     if (a === 'obs') connect();
     if (a === 'mic') refreshMic();
+    if (a === 'match') pushMatch();
   } else if (t.dataset.k) {
     const i = +t.closest('tr').dataset.i; const k = t.dataset.k;
-    if (k === 'color') { val = val.trim(); if (!val.startsWith('#')) val = '#' + val; if (!/^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(val)) { toast('Цвет: формат #RRGGBB, например #3b5bdb', true); renderSettings(); return; } }
     if (k === 'duration' && !(val >= 0.5)) { val = 8; toast('Длительность: минимум 0,5 с — поставлено 8 с'); }
     S.cells[i][k] = val;
     if (k === 'counterValue' && S.cells[i].source && obs.identified) act.setText(S.cells[i].source, S.cells[i].counterTemplate.replace('{n}', val)).catch((err) => toast(err.message, true));
   }
-  persist(); if (['type', 'label', 'color', 'duration'].includes(t.dataset.k) || t.dataset.g?.startsWith('grid')) renderSettings();
+  persist(); if (['type', 'label', 'duration', 'source'].includes(t.dataset.k) || t.dataset.g) renderSettings();
 });
 $('#btnExport').onclick = () => {
   const blob = new Blob([JSON.stringify(S, null, 2)], { type: 'application/json' }); const a = document.createElement('a');
@@ -339,4 +386,4 @@ $('#btnNewStream').onclick = () => { newStream(); renderTimecodes(); };
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 if (navigator.wakeLock) { const wl = () => navigator.wakeLock.request('screen').catch(() => {}); wl(); document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && wl()); }
-route(); connect();
+renderMatch(); route(); connect();

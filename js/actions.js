@@ -1,7 +1,7 @@
 // Слой действий: UI вызывает только эти функции, а не OBS напрямую.
 // В v2 сюда добавятся действия для локальных Browser Source (obs.broadcast).
 export class Actions extends EventTarget {
-  constructor(obs, getState) { super(); this.obs = obs; this.getState = getState; this.index = new Map(); this.active = new Map(); this.lastReplay = null; }
+  constructor(obs, getState) { super(); this.obs = obs; this.getState = getState; this.index = new Map(); this.active = new Map(); this.lastReplay = null; this.scenes = []; this.inputs = []; }
   async rebuildIndex() {
     const idx = new Map();
     const add = (name, ref) => { if (!idx.has(name)) idx.set(name, []); idx.get(name).push(ref); };
@@ -17,6 +17,9 @@ export class Actions extends EventTarget {
       }
     }
     this.index = idx;
+    this.scenes = scenes.map((x) => x.sceneName).sort((a, b) => a.localeCompare(b));
+    const { inputs } = await this.obs.call('GetInputList');
+    this.inputs = inputs.map((x) => x.inputName).sort((a, b) => a.localeCompare(b));
     this.dispatchEvent(new Event('index'));
     return idx;
   }
@@ -43,15 +46,21 @@ export class Actions extends EventTarget {
     return !sceneItemEnabled;
   }
   saveReplay() { return this.obs.call('SaveReplayBuffer'); }
+  // Путь к последнему повтору: всегда свежий запрос в OBS (кэш — только запасной вариант)
   async getLastReplay() {
-    if (this.lastReplay) return this.lastReplay;
-    const r = await this.obs.call('GetLastReplayBufferReplay'); return r.savedReplayPath;
+    try { const r = await this.obs.call('GetLastReplayBufferReplay'); if (r.savedReplayPath) return r.savedReplayPath; } catch {}
+    return this.lastReplay;
   }
   async playLastReplay(mediaSource) {
     const path = await this.getLastReplay();
-    if (!path) throw new Error('Повторов пока нет');
-    await this.obs.call('SetInputSettings', { inputName: mediaSource, inputSettings: { local_file: path, is_local_file: true } });
-    await this.show(mediaSource);
+    if (!path) throw new Error('Повторов пока нет — сначала «Сохранить повтор»');
+    const ref = this.lookup(mediaSource);
+    await this.setVisible(ref, false);
+    // Сбрасываем файл и ставим новый: так Media Source гарантированно перечитывает видео,
+    // а не играет старое из памяти.
+    await this.obs.call('SetInputSettings', { inputName: mediaSource, inputSettings: { local_file: '' } });
+    await this.obs.call('SetInputSettings', { inputName: mediaSource, inputSettings: { local_file: path, is_local_file: true, looping: false } });
+    await this.setVisible(ref, true);
     try { await this.obs.call('TriggerMediaInputAction', { inputName: mediaSource, mediaAction: 'OBS_WEBSOCKET_MEDIA_INPUT_ACTION_RESTART' }); } catch {}
   }
   stopMedia(mediaSource) { return this.obs.call('TriggerMediaInputAction', { inputName: mediaSource, mediaAction: 'OBS_WEBSOCKET_MEDIA_INPUT_ACTION_STOP' }); }

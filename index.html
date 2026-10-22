@@ -8,7 +8,7 @@
   <header class="mainhdr">
     <div class="stat">
       <span id="conn" class="conn">OBS …</span>
-      <span id="live" class="live">○ НЕ В ЭФИРЕ</span><span id="rec" class="rec">○ REC</span><span id="elapsed"></span>
+      <span id="live" class="live">○ НЕ В ЭФИРЕ</span><span id="rec" class="rec">○ REC</span><span id="buf" class="buf" role="button">○ Буфер</span><span id="elapsed"></span>
       <span id="gtimer" class="gtimer"></span><span id="clock" class="clock"></span>
     </div>
     <span class="sp"></span>
@@ -18,9 +18,9 @@
       <button id="btnReplay">⟲ Сохранить повтор</button>
       <button id="btnPlay">▶ Показать повтор</button>
       <button id="btnMic" class="dim">🎤 Мик</button>
+      <div id="match" class="match"><button data-md="-1" aria-label="матч минус">−</button><span id="matchN">Матч 1</span><button data-md="1" aria-label="матч плюс">+</button></div>
     </div>
     <div class="sec">
-      <button id="btnBuffer" class="rbuf">○ Буфер</button>
       <button id="btnHide">Скрыть всё</button>
       <a class="btn" href="#timecodes">Таймкоды</a>
       <a class="btn" href="#settings" aria-label="Настройки">⚙</a>
@@ -32,8 +32,7 @@
   <header><a class="btn" href="#main">← Назад</a><h2>Настройки</h2><span class="sp"></span>
     <button id="btnRescan">Обновить список из OBS</button></header>
   <div id="g"></div>
-  <datalist id="srcList"></datalist><datalist id="micList"></datalist>
-  <section class="box"><h3>Ячейки</h3>
+    <section class="box"><h3>Ячейки</h3>
     <p class="hint">Порядок ячеек меняется на главном экране кнопкой ⇅ (справа внизу).</p>
     <div class="tblwrap"><table><thead><tr><th>№</th><th>Текст</th><th>Цвет</th><th>Тип</th><th>Источник OBS</th><th>Режим / шаблон</th><th>Длит., с</th><th>Таймкод</th></tr></thead><tbody></tbody></table></div>
   </section>

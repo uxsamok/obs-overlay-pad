@@ -4,7 +4,7 @@ header{display:flex;align-items:center;gap:8px;padding:6px 10px;background:#1a20
 .sp{flex:1}button,.btn{background:#2c3546;color:#fff;border:0;border-radius:8px;padding:10px 14px;font-size:15px;text-decoration:none;cursor:pointer}
 button:active,.btn:active{filter:brightness(1.4)}.danger,.alert{background:#a3262a}.rbuf.on,#btnPlay.on,#btnReorder.on{background:#1f8a3b}.dim{opacity:.55}
 .conn{padding:6px 10px;border-radius:6px;font-weight:600}.conn.connected{background:#1f7a3c}.conn.connecting{background:#8a6d10}.conn.disconnected,.conn.error{background:#a3262a}
-.live{padding:6px 10px;border-radius:6px;background:#333;font-weight:700}.live.on{background:#d11}.rec{padding:6px 10px;border-radius:6px;background:#333;font-weight:700}.rec.on{background:#8f1d1d}.live.warn{background:#d17a00;animation:blink 1s steps(2) infinite}
+.live{padding:6px 10px;border-radius:6px;background:#333;font-weight:700}.live.on{background:#d11}.rec{padding:6px 10px;border-radius:6px;background:#333;font-weight:700}.rec.on{background:#8f1d1d}
 @keyframes blink{50%{opacity:.3}}#elapsed,.clock{font-variant-numeric:tabular-nums;font-size:18px}.gtimer{font-variant-numeric:tabular-nums;font-size:18px;color:#7fd4ff}
 main{flex:1;display:flex;min-height:0}#grid{flex:1;overflow-y:auto;scroll-snap-type:y mandatory;touch-action:pan-y}
 .page{height:100%;scroll-snap-align:start;display:grid;grid-template-columns:repeat(var(--cols),1fr);grid-template-rows:repeat(var(--rows),1fr);gap:8px;padding:8px}
@@ -34,11 +34,29 @@ th,td{padding:4px;border-bottom:1px solid #263042;text-align:left;font-size:13px
 .side{display:flex;flex-direction:column;width:52px;padding:8px 6px 8px 0}.side #pages{width:auto;padding:0;flex:0 1 auto}
 #btnReorder{padding:8px 0;font-size:16px;background:#232a37;opacity:.7}#btnReorder.on{opacity:1}
 body.reorder #grid{scroll-snap-type:none}body.reorder .cell{touch-action:none;border:3px dashed #ffffff55;cursor:grab}
-.cell.dragging{z-index:5;opacity:.85;box-shadow:0 8px 24px #000a}.cell.drop{border:3px solid #3b82f6}
+body.reorder .cell{transition:transform .18s ease}.cell.dragging{z-index:5;opacity:.9;box-shadow:0 8px 24px #000a;transition:none!important}
 /* настройки */
 .box{background:#1a202b;border-radius:10px;margin:10px;padding:10px}.box h3{margin:0 0 8px;font-size:17px}.box .gset{padding:0}.box .tblwrap{padding:0}
 .howto{margin:0 0 10px;padding-left:22px;line-height:1.5;font-size:14px}.howto code,.hint code{background:#0c1016;padding:1px 4px;border-radius:4px}.hint{font-size:13px;opacity:.75;margin:6px 0}
 .chk{display:flex;flex-wrap:wrap;gap:6px 16px}.chk label{font-size:14px;display:flex;align-items:center;gap:6px}
-.sw{display:grid;grid-template-columns:repeat(6,24px);gap:3px;margin-bottom:4px}.sw button{width:24px;height:24px;padding:0;border-radius:4px;border:2px solid transparent}.sw button.cur{border-color:#fff}
-input.hex{width:110px;font-family:monospace}
 .sec .alert{background:#a3262a}
+/* мик выключен — яркое быстрое мигание */
+#btnMic.alert{animation:micblink .4s steps(2) infinite}@keyframes micblink{0%{background:#ff1a1a;box-shadow:0 0 18px #ff1a1a}50%{background:#5a0d0d;box-shadow:none}}
+/* индикатор буфера повтора (маленький, не кнопка) */
+.buf{padding:4px 8px;border-radius:6px;background:#333;font-size:12px;font-weight:600;cursor:pointer}.buf.on{background:#1f5f33}.buf.off{background:#a3262a}
+/* номер матча в шапке */
+.match{display:flex;align-items:center;gap:6px;background:#232a37;border-radius:12px;padding:4px}.match button{font-size:26px;font-weight:800;min-width:52px;min-height:48px;padding:0;background:#3a4558}
+.match span{font-size:17px;font-weight:700;min-width:70px;text-align:center;font-variant-numeric:tabular-nums}
+/* настройки */
+select.pick{max-width:240px;width:100%}.swbtn{width:44px;height:36px;padding:0;border:2px solid #fff6;border-radius:8px}
+details{display:inline}details summary{cursor:pointer;color:#7fb2ff;display:inline}details[open]{display:block;margin-top:4px}
+/* окно выбора цвета */
+#cp{position:fixed;inset:0;background:#000a;display:flex;align-items:center;justify-content:center;z-index:50}#cp[hidden]{display:none}
+.cp-box{background:#1a202b;border-radius:14px;padding:14px;width:min(340px,92vw);display:flex;flex-direction:column;gap:12px;-webkit-user-select:none;user-select:none}
+.cp-top{display:flex;gap:10px}.cp-prev{width:56px;border-radius:8px;border:2px solid #fff4}.cp-hex{flex:1;font:18px monospace}
+.cp-sw{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}.cp-sw button{aspect-ratio:1;padding:0;border:3px solid transparent;border-radius:8px}.cp-sw button.cur{border-color:#fff}
+.cp-sv{position:relative;height:170px;border-radius:8px;touch-action:none;cursor:crosshair}
+.cp-dot{position:absolute;width:22px;height:22px;margin:-11px 0 0 -11px;border:3px solid #fff;border-radius:50%;box-shadow:0 0 3px #000;pointer-events:none}
+.cp-hue{position:relative;height:30px;border-radius:15px;touch-action:none;background:linear-gradient(to right,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00)}
+.cp-knob{position:absolute;top:-3px;width:16px;height:36px;margin-left:-8px;border:3px solid #fff;border-radius:6px;box-shadow:0 0 3px #000;pointer-events:none}
+.cp-btns{display:flex;justify-content:flex-end;gap:10px}.cp-ok{background:#2f5bd3}
