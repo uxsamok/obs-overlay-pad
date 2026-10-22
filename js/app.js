@@ -290,6 +290,9 @@ const box = (title, inner) => `<section class="box"><h3>${title}</h3>${inner}</s
 function renderSettings() {
   const v = $('#v-settings');
   const items = [...act.index.keys()].sort((a, b) => a.localeCompare(b)); // всё, что стоит в сценах
+  // Ячейки: <input list> — набор текста фильтрует варианты (удобно при многих источниках)
+  const dl = (l) => l.map((n) => `<option value="${esc(n)}">`).join('');
+  $('#srcList').innerHTML = dl(items); $('#inpList').innerHTML = dl(act.inputs);
   if (obs.identified && !renderSettings.mic) act.audioInputs().then((l) => { renderSettings.mic = l; renderSettings(); }).catch(() => {});
   v.querySelector('#g').innerHTML =
     box('Подключение OBS', `<div class="gset">
@@ -315,7 +318,9 @@ function renderSettings() {
     <td>${i + 1}</td><td><input data-k="label" value="${esc(c.label)}"></td>
     <td><button type="button" class="swbtn" data-color="${i}" style="background:${esc(c.color)}" aria-label="Цвет ${esc(c.color)}"></button></td>
     <td>${sel('type', typeOpts, c.type)}</td>
-    <td>${c.type === 'replay' ? '<span class="hint">из раздела «Повтор»</span>' : pick('data-k="source"', c.source, c.type === 'counter' ? act.inputs : items)}</td>
+    <td>${c.type === 'replay' ? '<span class="hint">из раздела «Повтор»</span>' : (() => { const l = c.type === 'counter' ? act.inputs : items;
+      const miss = c.source && obs.identified && !l.includes(c.source);
+      return `<input data-k="source" value="${esc(c.source)}" list="${c.type === 'counter' ? 'inpList' : 'srcList'}" placeholder="Начните вводить имя…" autocomplete="off"${miss ? ' class="miss" title="Нет в OBS"' : ''}>${miss ? '<div class="warnsm">⚠ нет в OBS</div>' : ''}`; })()}</td>
     <td>${c.type === 'counter' ? `<input data-k="counterTemplate" value="${esc(c.counterTemplate)}" title="Шаблон, {n} — число"> № <input data-k="counterValue" type="number" value="${esc(c.counterValue)}">` : sel('mode', modeOpts, c.mode)}</td>
     <td>${c.type === 'counter' ? '' : `<input data-k="duration" type="number" min="0.5" step="0.5" value="${c.duration}">`}</td>
     <td><input data-k="timecode" type="checkbox"${c.timecode ? ' checked' : ''}></td></tr>`).join('');
