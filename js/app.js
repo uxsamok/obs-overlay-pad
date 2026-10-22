@@ -105,8 +105,8 @@ const elapsed = () => live.streaming ? live.streamMs + (Date.now() - live.at) : 
 function curStream() { if (!S.streams.length) newStream(); return S.streams[S.streams.length - 1]; }
 function newStream() { const d = new Date(); S.streams.push({ id: d.getTime(), title: t('tc.streamTitle', { date: d.toLocaleString(getLang()) }), marks: [] }); persist(); }
 function addMark(label) {
-  const t = elapsed(); if (t == null) { toast(t('toast.noTimecode'), true); return; }
-  curStream().marks.push({ t, label }); persist(); toast(`★ ${fmt(t, t >= 3600e3)} ${label}`);
+  const ms = elapsed(); if (ms == null) { toast(t('toast.noTimecode'), true); return; }
+  curStream().marks.push({ t: ms, label }); persist(); toast(`★ ${fmt(ms, ms >= 3600e3)} ${label}`);
 }
 function youtubeText(st) {
   const marks = [...st.marks].sort((a, b) => a.t - b.t); const long = marks.some((m) => m.t >= 3600e3);
@@ -343,22 +343,22 @@ $('#v-settings').addEventListener('click', (e) => { // цвет ячейки -> 
   openColorPicker(S.cells[i].color, (hex) => { S.cells[i].color = hex; persist(); renderSettings(); });
 });
 $('#v-settings').addEventListener('change', (e) => {
-  const t = e.target; let val = t.type === 'checkbox' ? t.checked : t.type === 'number' ? +t.value : t.value;
+  const el = e.target; let val = el.type === 'checkbox' ? el.checked : el.type === 'number' ? +el.value : el.value;
   if (val === '__manual') { const v = prompt(t('prompt.manualName')); if (v == null) { renderSettings(); return; } val = v.trim(); }
-  if (t.dataset.gt) { S.cells[+t.dataset.gt].startGameTimer = val; persist(); return; }
-  if (t.dataset.g) {
-    const [a, b] = t.dataset.g.split('.'); if (b) S[a][b] = val; else S[a] = val;
+  if (el.dataset.gt) { S.cells[+el.dataset.gt].startGameTimer = val; persist(); return; }
+  if (el.dataset.g) {
+    const [a, b] = el.dataset.g.split('.'); if (b) S[a][b] = val; else S[a] = val;
     if (a === 'grid') resizeCells(S);
     if (a === 'obs') connect();
     if (a === 'mic') refreshMic();
     if (a === 'match') pushMatch();
-  } else if (t.dataset.k) {
-    const i = +t.closest('tr').dataset.i; const k = t.dataset.k;
+  } else if (el.dataset.k) {
+    const i = +el.closest('tr').dataset.i; const k = el.dataset.k;
     if (k === 'duration' && !(val >= 0.5)) { val = 8; toast(t('toast.durationFixed')); }
     S.cells[i][k] = val;
     if (k === 'counterValue' && S.cells[i].source && obs.identified) act.setText(S.cells[i].source, S.cells[i].counterTemplate.replace('{n}', val)).catch((err) => toast(err.message, true));
   }
-  persist(); if (['type', 'label', 'duration', 'source'].includes(t.dataset.k) || t.dataset.g) renderSettings();
+  persist(); if (['type', 'label', 'duration', 'source'].includes(el.dataset.k) || el.dataset.g) renderSettings();
 });
 $('#btnExport').onclick = () => {
   const blob = new Blob([JSON.stringify(S, null, 2)], { type: 'application/json' }); const a = document.createElement('a');
