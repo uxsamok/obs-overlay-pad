@@ -1,4 +1,4 @@
-const KEY = 'obs-overlay-pad-v1';
+const KEY = 'obs-overlay-pad-v1'; // ключ хранилища, НЕ версия приложения (не менять — потеряются настройки)
 export function defaultCell(i) {
   return { label: `Оверлей ${i + 1}`, color: '#2b3a55', type: 'overlay', source: '', mode: 'timer', duration: 8,
     timecode: false, startGameTimer: false, counterTemplate: 'Матч {n}', counterValue: 1 };

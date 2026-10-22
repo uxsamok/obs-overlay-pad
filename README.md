@@ -1,4 +1,7 @@
-# OBS Overlay Pad (v1)
+# OBS Overlay Pad
+
+Версия: см. файл [`VERSION`](VERSION) (сейчас 1.5.0); видна в приложении внизу страницы настроек.
+Схема: `MAJOR.MINOR.PATCH` — новая функция → +1 к MINOR, только исправления → +1 к PATCH. При выпуске поменять `VERSION` и `CACHE` в `sw.js`.
 
 PWA-пульт для планшета: сетка ячеек включает/выключает оверлеи в OBS Studio через obs-websocket v5. Без сборки и бэкенда — чистые HTML/CSS/JS.
 
