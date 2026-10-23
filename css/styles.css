@@ -62,3 +62,8 @@ details{display:inline}details summary{cursor:pointer;color:#7fb2ff;display:inli
 .cp-btns{display:flex;justify-content:flex-end;gap:10px}.cp-ok{background:#2f5bd3}
 .ver{text-align:center;font-size:12px;opacity:.5;margin:4px 0 24px}
 input.miss{border-color:#d9a400}.warnsm{font-size:11px;color:#ffd36b}
+/* кнопки сцен слева (симметрично страницам справа) */
+#scenes{width:112px;display:flex;flex-direction:column;gap:6px;padding:8px 0 8px 6px;overflow-y:auto;touch-action:pan-y}#scenes[hidden]{display:none}
+#scenes button{padding:12px 6px;font-size:14px;font-weight:600;line-height:1.2;word-break:break-word;background:#232a37;border:2px solid transparent;flex:0 0 auto}
+#scenes button.cur{background:#3b82f6;border-color:#9cc2ff}#scenes button.miss{opacity:.5;border-style:dashed;border-color:#d9a400}
+.chk label.missl{opacity:.6;color:#ffd36b}

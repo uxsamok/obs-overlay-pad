@@ -11,24 +11,24 @@ const act = new Actions(obs, () => S);
 const $ = (q, r = document) => r.querySelector(q);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const persist = () => save(S);
-const fmt = (ms, forceH = false) => { const t = Math.max(0, Math.floor(ms / 1000)); const h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), s = t % 60;
+const fmt = (ms, forceH = false) => { const sec = Math.max(0, Math.floor(ms / 1000)); const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60;
   const p = (n) => String(n).padStart(2, '0'); return (h || forceH ? h + ':' + p(m) : p(m)) + ':' + p(s); };
 let live = { streaming: false, recording: false, streamMs: 0, recordMs: 0, at: 0 };
 const active = new Map(); // idx -> {until, timer}
 let gameTimer = null; // {start}
 
-function toast(msg, err) { const t = $('#toast'); t.textContent = msg; t.className = 'show' + (err ? ' err' : ''); clearTimeout(toast.h); toast.h = setTimeout(() => t.className = '', 2500); }
+function toast(msg, err) { const el = $('#toast'); el.textContent = msg; el.className = 'show' + (err ? ' err' : ''); clearTimeout(toast.h); toast.h = setTimeout(() => el.className = '', 2500); }
 
 // ---------- OBS ----------
 obs.addEventListener('status', async (e) => {
   const st = e.detail.status; const el = $('#conn');
   el.className = 'conn ' + st; el.textContent = { connected: 'OBS ✓', connecting: 'OBS …', disconnected: 'OBS ✕', error: 'OBS ✕' }[st];
-  if (st === 'connected') { renderSettings.mic = null; try { await act.rebuildIndex(); await poll(); await ensureBuffer(); refreshMic(); pushMatch(); } catch (err) { toast(err.message, true); } }
-  else { setBuffer(null); setMic(null); }
+  if (st === 'connected') { renderSettings.mic = null; try { await act.rebuildIndex(); await poll(); await refreshScene(); await ensureBuffer(); refreshMic(); pushMatch(); } catch (err) { toast(err.message, true); } }
+  else { setBuffer(null); setMic(null); curScene = null; }
   renderGrid();
 });
 for (const ev of ['SceneItemCreated', 'SceneItemRemoved', 'InputNameChanged', 'SceneCreated', 'SceneRemoved', 'SceneNameChanged'])
-  obs.addEventListener(ev, () => { clearTimeout(act.rb); act.rb = setTimeout(() => act.rebuildIndex().then(renderGrid).catch(() => {}), 500); });
+  obs.addEventListener(ev, () => { clearTimeout(act.rb); act.rb = setTimeout(() => act.rebuildIndex().then(() => { renderGrid(); if (location.hash === '#settings') renderSettings(); }).catch(() => {}), 500); });
 obs.addEventListener('StreamStateChanged', (e) => { if (e.detail.outputState === 'OBS_WEBSOCKET_OUTPUT_STARTED') newStream(); poll(); });
 obs.addEventListener('RecordStateChanged', () => poll());
 obs.addEventListener('ReplayBufferSaved', (e) => {
@@ -96,12 +96,23 @@ obs.addEventListener('SceneItemEnableStateChanged', (e) => {
     const ref = (act.index.get(c.source) || [])[0];
     if (ref && ref.sceneName === e.detail.sceneName && ref.sceneItemId === e.detail.sceneItemId) { e.detail.sceneItemEnabled ? active.set(i, {}) : active.delete(i); updateCell(i); } } });
 });
+// Сцены: кнопки слева; подсветка текущей программной сцены
+let curScene = null;
+async function refreshScene() { if (!obs.identified) return; try { curScene = await act.currentScene(); } catch {} renderScenes(); }
+obs.addEventListener('CurrentProgramSceneChanged', (e) => { curScene = e.detail.sceneName; renderScenes(); });
+function renderScenes() {
+  const nav = $('#scenes'); const list = S.sceneButtons;
+  nav.innerHTML = list.map((n) => `<button data-scene="${esc(n)}" class="${n === curScene ? 'cur' : ''}${obs.identified && act.sceneOrder.length && !act.sceneOrder.includes(n) ? ' miss' : ''}">${esc(n)}</button>`).join('');
+  nav.hidden = !list.length;
+}
 async function poll() { if (!obs.identified) return; try { live = { ...(await act.status()), at: Date.now() }; } catch {} }
 setInterval(poll, 5000);
 function connect() { obs.connect(S.obs.host, S.obs.port, S.obs.password); }
 
 // ---------- Таймкоды ----------
-const elapsed = () => live.streaming ? live.streamMs + (Date.now() - live.at) : live.recording ? live.recordMs + (Date.now() - live.at) : null;
+// Отсчёт — от старта трансляции в OBS (outputDuration из GetStreamStatus): 00:00 записи на YouTube
+// = начало приёма потока (при включённом автостарте). Время записи (REC) не используется.
+const elapsed = () => live.streaming ? live.streamMs + (Date.now() - live.at) : null;
 function curStream() { if (!S.streams.length) newStream(); return S.streams[S.streams.length - 1]; }
 function newStream() { const d = new Date(); S.streams.push({ id: d.getTime(), title: t('tc.streamTitle', { date: d.toLocaleString(getLang()) }), marks: [] }); persist(); }
 function addMark(label) {
@@ -182,6 +193,7 @@ function renderGrid() {
   $('#pages').innerHTML = pages > 1 ? Array.from({ length: pages }, (_, p) => `<button data-p="${p}">${p + 1}</button>`).join('') : '';
   $('#pages').style.display = pages > 1 ? '' : 'none';
   document.body.classList.toggle('reorder', reorder);
+  renderScenes();
 }
 // тап vs прокрутка: активация, только если палец сдвинулся < 10px
 let down = null;
@@ -234,6 +246,16 @@ document.addEventListener('pointerup', (e) => {
   if (e.target.closest('.cell') !== c) return;
   c.classList.add('flash'); setTimeout(() => c.classList.remove('flash'), 150);
   press(+c.dataset.i, { currentTarget: c, target: e.target });
+});
+let sdown = null; // сцены: тап vs прокрутка, как у ячеек
+$('#scenes').addEventListener('pointerdown', (e) => { const b = e.target.closest('button'); sdown = b ? { b, x: e.clientX, y: e.clientY, id: e.pointerId } : null; });
+$('#scenes').addEventListener('pointermove', (e) => { if (sdown && e.pointerId === sdown.id && Math.hypot(e.clientX - sdown.x, e.clientY - sdown.y) >= 10) sdown = null; });
+$('#scenes').addEventListener('pointercancel', () => sdown = null);
+$('#scenes').addEventListener('pointerup', async (e) => {
+  if (!sdown || e.pointerId !== sdown.id) return; const b = sdown.b; sdown = null;
+  if (e.target.closest('button') !== b) return;
+  if (!obs.identified) return toast(t('err.noObs'), true);
+  try { await act.setScene(b.dataset.scene); curScene = b.dataset.scene; renderScenes(); } catch (err) { toast(err.message, true); }
 });
 $('#pages').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) $(`.page[data-p="${b.dataset.p}"]`).scrollIntoView({ behavior: 'smooth' }); });
 $('#grid').addEventListener('scroll', () => {
@@ -295,8 +317,12 @@ function renderSettings() {
   const dl = (l) => l.map((n) => `<option value="${esc(n)}">`).join('');
   $('#srcList').innerHTML = dl(items); $('#inpList').innerHTML = dl(act.inputs); $('#sceneList').innerHTML = dl(act.scenes);
   if (obs.identified && !renderSettings.mic) act.audioInputs().then((l) => { renderSettings.mic = l; renderSettings(); }).catch(() => {});
+  v.querySelector('#g1').innerHTML =
+    box(t('settings.lang.title'), `<div class="gset"><label>${t('settings.lang.label')} <select id="langSel">${(renderSettings.langs || []).map((l) => `<option value="${esc(l.code)}"${l.code === getLang() ? ' selected' : ''}>${esc(l.name)}</option>`).join('')}</select></label></div>`);
+  const sc = [...new Set([...act.sceneOrder, ...S.sceneButtons])]; // сцены OBS + отмеченные, которых сейчас нет
   v.querySelector('#g').innerHTML =
-    box(t('settings.lang.title'), `<div class="gset"><label>${t('settings.lang.label')} <select id="langSel">${(renderSettings.langs || []).map((l) => `<option value="${esc(l.code)}"${l.code === getLang() ? ' selected' : ''}>${esc(l.name)}</option>`).join('')}</select></label></div>`) +
+    box(t('settings.scenes.title'), sc.length ? `<div class="chk">${sc.map((n) => { const miss = obs.identified && !act.sceneOrder.includes(n);
+      return `<label${miss ? ` class="missl" title="${t('settings.missingTitle')}"` : ''}><input type="checkbox" data-scn="${esc(n)}"${S.sceneButtons.includes(n) ? ' checked' : ''}> ${esc(n)}</label>`; }).join('')}</div>` : `<p class="hint">${t('settings.scenes.empty')}</p>`) +
     box(t('settings.obs.title'), `<div class="gset">
       <label>${t('settings.obs.host')} <input data-g="obs.host" value="${esc(S.obs.host)}"></label>
       <label>${t('settings.obs.port')} <input data-g="obs.port" type="number" value="${S.obs.port}"></label>
@@ -345,6 +371,8 @@ $('#v-settings').addEventListener('click', (e) => { // цвет ячейки -> 
 $('#v-settings').addEventListener('change', (e) => {
   const el = e.target; let val = el.type === 'checkbox' ? el.checked : el.type === 'number' ? +el.value : el.value;
   if (val === '__manual') { const v = prompt(t('prompt.manualName')); if (v == null) { renderSettings(); return; } val = v.trim(); }
+  if (el.dataset.scn != null) { const n = el.dataset.scn; const set = new Set(S.sceneButtons); val ? set.add(n) : set.delete(n);
+    const order = [...act.sceneOrder, ...S.sceneButtons]; S.sceneButtons = [...new Set(order)].filter((x) => set.has(x)); persist(); renderScenes(); return; }
   if (el.dataset.gt) { S.cells[+el.dataset.gt].startGameTimer = val; persist(); return; }
   if (el.dataset.g) {
     const [a, b] = el.dataset.g.split('.'); if (b) S[a][b] = val; else S[a] = val;

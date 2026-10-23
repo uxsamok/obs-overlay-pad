@@ -25,17 +25,18 @@
       <a class="btn" href="#settings" data-i18n-aria="hdr.settings">⚙</a>
     </div>
   </header>
-  <main><div id="grid"></div><div class="side"><nav id="pages"></nav><span class="sp"></span><button id="btnReorder" data-i18n-title="hdr.reorder" data-i18n-aria="hdr.reorder">⇅</button></div></main>
+  <main><nav id="scenes" hidden></nav><div id="grid"></div><div class="side"><nav id="pages"></nav><span class="sp"></span><button id="btnReorder" data-i18n-title="hdr.reorder" data-i18n-aria="hdr.reorder">⇅</button></div></main>
 </div>
 <div id="v-settings" class="view page-scroll" hidden>
   <header><a class="btn" href="#main" data-i18n="nav.back"></a><h2 data-i18n="settings.title"></h2><span class="sp"></span>
     <button id="btnRescan" data-i18n="settings.rescan"></button></header>
-  <div id="g"></div>
+  <div id="g1"></div>
     <datalist id="srcList"></datalist><datalist id="inpList"></datalist><datalist id="sceneList"></datalist>
   <section class="box"><h3 data-i18n="settings.cells.title"></h3>
     <p class="hint" data-i18n="settings.cells.hint"></p>
     <div class="tblwrap"><table><thead><tr><th data-i18n="th.num"></th><th data-i18n="th.label"></th><th data-i18n="th.color"></th><th data-i18n="th.type"></th><th data-i18n="th.source"></th><th data-i18n="th.mode"></th><th data-i18n="th.duration"></th><th data-i18n="th.timecode"></th></tr></thead><tbody></tbody></table></div>
   </section>
+  <div id="g"></div>
   <section class="box"><h3 data-i18n="settings.backup.title"></h3>
     <button id="btnExport" data-i18n="settings.backup.export"></button>
     <label class="btn"><span data-i18n="settings.backup.import"></span><input id="fileImport" type="file" accept="application/json,.json" hidden></label>

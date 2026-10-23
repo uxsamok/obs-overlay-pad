@@ -13,6 +13,7 @@ export function defaultState() {
     gameTimer: { source: '', format: 'mm:ss' },
     replay: { mediaSource: '' },
     match: { source: '', template: t('defaults.counterTemplate'), value: 1 }, // номер матча (− N + в шапке)
+    sceneButtons: [], // имена сцен OBS, показанных кнопками слева на главном экране
     mic: { source: '' }, // аудиовход OBS для кнопки «Мик»
     cells: Array.from({ length: 12 }, (_, i) => defaultCell(i)),
     streams: [], // {id, title, startedAt, marks:[{t, label}]}
@@ -23,7 +24,7 @@ export function normalize(s) {
   s = Object.assign(d, s || {});
   s.obs = Object.assign(defaultState().obs, s.obs); s.grid = Object.assign(defaultState().grid, s.grid);
   s.gameTimer = Object.assign(defaultState().gameTimer, s.gameTimer); s.replay = Object.assign(defaultState().replay, s.replay);
-  s.mic = Object.assign(defaultState().mic, s.mic); s.match = Object.assign(defaultState().match, s.match); s.match.value = +s.match.value || 0; s.version = 2;
+  s.mic = Object.assign(defaultState().mic, s.mic); s.match = Object.assign(defaultState().match, s.match); s.match.value = +s.match.value || 0; if (!Array.isArray(s.sceneButtons)) s.sceneButtons = []; s.version = 2;
   resizeCells(s);
   return s;
 }

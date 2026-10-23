@@ -2,7 +2,7 @@ import { t } from './i18n.js';
 // Слой действий: UI вызывает только эти функции, а не OBS напрямую.
 // В v2 сюда добавятся действия для локальных Browser Source (obs.broadcast).
 export class Actions extends EventTarget {
-  constructor(obs, getState) { super(); this.obs = obs; this.getState = getState; this.index = new Map(); this.active = new Map(); this.lastReplay = null; this.scenes = []; this.inputs = []; }
+  constructor(obs, getState) { super(); this.obs = obs; this.getState = getState; this.index = new Map(); this.active = new Map(); this.lastReplay = null; this.scenes = []; this.sceneOrder = []; this.inputs = []; }
   async rebuildIndex() {
     const idx = new Map();
     const add = (name, ref) => { if (!idx.has(name)) idx.set(name, []); idx.get(name).push(ref); };
@@ -18,6 +18,8 @@ export class Actions extends EventTarget {
       }
     }
     this.index = idx;
+    // порядок как в списке сцен OBS (GetSceneList отдаёт снизу вверх)
+    this.sceneOrder = scenes.map((x) => x.sceneName).reverse();
     this.scenes = scenes.map((x) => x.sceneName).sort((a, b) => a.localeCompare(b));
     const { inputs } = await this.obs.call('GetInputList');
     this.inputs = inputs.map((x) => x.inputName).sort((a, b) => a.localeCompare(b));
@@ -64,6 +66,8 @@ export class Actions extends EventTarget {
     await this.setVisible(ref, true);
     try { await this.obs.call('TriggerMediaInputAction', { inputName: mediaSource, mediaAction: 'OBS_WEBSOCKET_MEDIA_INPUT_ACTION_RESTART' }); } catch {}
   }
+  setScene(sceneName) { return this.obs.call('SetCurrentProgramScene', { sceneName }); }
+  async currentScene() { return (await this.obs.call('GetCurrentProgramScene')).currentProgramSceneName; }
   stopMedia(mediaSource) { return this.obs.call('TriggerMediaInputAction', { inputName: mediaSource, mediaAction: 'OBS_WEBSOCKET_MEDIA_INPUT_ACTION_STOP' }); }
   async replayBufferActive() { return (await this.obs.call('GetReplayBufferStatus')).outputActive; }
   startReplayBuffer() { return this.obs.call('StartReplayBuffer'); }
