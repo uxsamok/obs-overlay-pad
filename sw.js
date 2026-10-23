@@ -3,7 +3,7 @@
 // (с таймаутом), при ошибке/зависании сети — из кэша. Удачные ответы сети обновляют кэш,
 // так что новая версия с сервера подхватывается при следующем открытии.
 // Добавили/переименовали файл приложения -> впишите его в FILES и увеличьте номер в CACHE.
-const CACHE = 'overlay-pad-1.7.0'; // = файл VERSION; меняйте вместе
+const CACHE = 'overlay-pad-1.8.0'; // = файл VERSION; меняйте вместе
 const NET_TIMEOUT_MS = 2500;
 const FILES = ['./', 'index.html', 'css/styles.css', 'js/app.js', 'js/obs.js', 'js/actions.js', 'js/store.js', 'js/colorpicker.js', 'manifest.webmanifest', 'VERSION', 'js/i18n.js', 'i18n/en.json', 'i18n/ru.json', 'i18n/languages.json', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png'];
 

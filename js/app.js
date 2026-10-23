@@ -2,7 +2,7 @@ import { ObsClient } from './obs.js';
 import { Actions } from './actions.js';
 import { openColorPicker } from './colorpicker.js';
 import { initI18n, setLang, getLang, languages, t, applyI18n } from './i18n.js';
-import { load, save, normalize, resizeCells, defaultState } from './store.js';
+import { load, save, normalize, resizeCells, defaultState, defaultPreset, normalizePreset, curPreset } from './store.js';
 
 await initI18n(); // язык — до загрузки состояния (тексты по умолчанию берутся из перевода)
 let S = load();
@@ -23,7 +23,7 @@ function toast(msg, err) { const el = $('#toast'); el.textContent = msg; el.clas
 obs.addEventListener('status', async (e) => {
   const st = e.detail.status; const el = $('#conn');
   el.className = 'conn ' + st; el.textContent = { connected: 'OBS ✓', connecting: 'OBS …', disconnected: 'OBS ✕', error: 'OBS ✕' }[st];
-  if (st === 'connected') { renderSettings.mic = null; try { await act.rebuildIndex(); await poll(); await refreshScene(); await ensureBuffer(); refreshMic(); pushMatch(); } catch (err) { toast(err.message, true); } }
+  if (st === 'connected') { renderSettings.mic = null; try { await act.rebuildIndex(); await poll(); await refreshScene(); await syncActive(); await ensureBuffer(); refreshMic(); pushMatch(); } catch (err) { toast(err.message, true); } }
   else { setBuffer(null); setMic(null); curScene = null; }
   renderGrid();
 });
@@ -90,12 +90,40 @@ let micMuted = null; // true / false / null (не настроен или нет
 function setMic(m) { micMuted = m; const b = $('#btnMic'); b.classList.toggle('alert', m === true); b.classList.toggle('dim', m == null); b.textContent = t(m === true ? 'hdr.micMuted' : 'hdr.mic'); }
 async function refreshMic() { if (!obs.identified || !S.mic.source) return setMic(null); try { setMic(await act.getMute(S.mic.source)); } catch { setMic(null); } }
 obs.addEventListener('InputMuteStateChanged', (e) => { if (e.detail.inputName === S.mic.source) setMic(e.detail.inputMuted); });
+// Оверлеи, видимые в OBS -> подсветка ячеек. Источник ячейки = первая запись индекса (как в act.show/hide).
+const cellRef = (c) => c.type === 'overlay' && c.source ? (act.index.get(c.source) || [])[0] : null;
+// При подключении / смене пресета: включённые в OBS — «в эфире» (без отсчёта: сколько осталось, неизвестно).
+async function syncActive() {
+  if (!obs.identified) return;
+  const seen = new Map(); // ref -> enabled (одинаковый источник в нескольких ячейках — один запрос)
+  for (let i = 0; i < S.cells.length; i++) {
+    const c = S.cells[i]; const ref = cellRef(c); if (!ref) continue;
+    const key = ref.sceneName + '\n' + ref.sceneItemId;
+    if (!seen.has(key)) { try { seen.set(key, (await obs.call('GetSceneItemEnabled', ref)).sceneItemEnabled); } catch { seen.set(key, null); } }
+    const on = seen.get(key); if (on == null) continue;
+    if (on && !active.has(i)) active.set(i, { source: c.source });
+    else if (!on && active.has(i)) { clearTimeout(active.get(i).timer); active.delete(i); }
+  }
+  renderGrid();
+}
+// Включили/выключили в самом OBS. Свои show/hide петли не дают: show() сначала выключает
+// (ячейка ещё не активна), потом включает (startActive перезапишет состояние с таймером);
+// stopCell убирает подсветку до hide().
 obs.addEventListener('SceneItemEnableStateChanged', (e) => {
-  // синхронизация подсветки переключателей, если оверлей выключили в самом OBS
-  S.cells.forEach((c, i) => { if (c.type === 'overlay' && c.mode === 'toggle' && c.source) {
-    const ref = (act.index.get(c.source) || [])[0];
-    if (ref && ref.sceneName === e.detail.sceneName && ref.sceneItemId === e.detail.sceneItemId) { e.detail.sceneItemEnabled ? active.set(i, {}) : active.delete(i); updateCell(i); } } });
+  const { sceneName, sceneItemId, sceneItemEnabled: on } = e.detail;
+  S.cells.forEach((c, i) => { const ref = cellRef(c);
+    if (!ref || ref.sceneName !== sceneName || ref.sceneItemId !== sceneItemId) return;
+    if (on && !active.has(i)) { active.set(i, { source: c.source }); updateCell(i); }
+    else if (!on && active.has(i)) { clearTimeout(active.get(i).timer); active.delete(i); updateCell(i); } });
 });
+// Пресеты: переключение меняет ячейки, сетку, сцены, микрофон, матч, «Скрыть всё»
+function clearActive() { for (const st of active.values()) clearTimeout(st.timer); active.clear(); }
+function renderPresetName() { $('#preset').textContent = S.presets.length > 1 ? curPreset(S).name : ''; }
+function applyPreset() {
+  clearActive(); replayOn = false; setPlayBtn(); persist();
+  renderMatch(); renderPresetName(); refreshMic(); pushMatch(); renderGrid(); syncActive();
+  if (location.hash === '#settings') renderSettings();
+}
 // Сцены: кнопки слева; подсветка текущей программной сцены
 let curScene = null;
 async function refreshScene() { if (!obs.identified) return; try { curScene = await act.currentScene(); } catch {} renderScenes(); }
@@ -317,12 +345,15 @@ function renderSettings() {
   const dl = (l) => l.map((n) => `<option value="${esc(n)}">`).join('');
   $('#srcList').innerHTML = dl(items); $('#inpList').innerHTML = dl(act.inputs); $('#sceneList').innerHTML = dl(act.scenes);
   if (obs.identified && !renderSettings.mic) act.audioInputs().then((l) => { renderSettings.mic = l; renderSettings(); }).catch(() => {});
-  v.querySelector('#g1').innerHTML =
-    box(t('settings.lang.title'), `<div class="gset"><label>${t('settings.lang.label')} <select id="langSel">${(renderSettings.langs || []).map((l) => `<option value="${esc(l.code)}"${l.code === getLang() ? ' selected' : ''}>${esc(l.name)}</option>`).join('')}</select></label></div>`);
+  v.querySelector('#g0').innerHTML =
+    box(t('settings.preset.title'), `<div class="gset prow"><select id="presetSel">${S.presets.map((p) => `<option value="${esc(p.id)}"${p.id === S.activePreset ? ' selected' : ''}>${esc(p.name)}</option>`).join('')}</select>
+      <button type="button" data-pa="new">${t('settings.preset.new')}</button><button type="button" data-pa="dup">${t('settings.preset.dup')}</button>
+      <button type="button" data-pa="ren">${t('settings.preset.rename')}</button><button type="button" data-pa="del" class="danger"${S.presets.length < 2 ? ' disabled' : ''}>${t('settings.preset.delete')}</button></div>`);
   const sc = [...new Set([...act.sceneOrder, ...S.sceneButtons])]; // сцены OBS + отмеченные, которых сейчас нет
   v.querySelector('#g').innerHTML =
     box(t('settings.scenes.title'), sc.length ? `<div class="chk">${sc.map((n) => { const miss = obs.identified && !act.sceneOrder.includes(n);
       return `<label${miss ? ` class="missl" title="${t('settings.missingTitle')}"` : ''}><input type="checkbox" data-scn="${esc(n)}"${S.sceneButtons.includes(n) ? ' checked' : ''}> ${esc(n)}</label>`; }).join('')}</div>` : `<p class="hint">${t('settings.scenes.empty')}</p>`) +
+    box(t('settings.lang.title'), `<div class="gset"><label>${t('settings.lang.label')} <select id="langSel">${(renderSettings.langs || []).map((l) => `<option value="${esc(l.code)}"${l.code === getLang() ? ' selected' : ''}>${esc(l.name)}</option>`).join('')}</select></label></div>`) +
     box(t('settings.obs.title'), `<div class="gset">
       <label>${t('settings.obs.host')} <input data-g="obs.host" value="${esc(S.obs.host)}"></label>
       <label>${t('settings.obs.port')} <input data-g="obs.port" type="number" value="${S.obs.port}"></label>
@@ -364,12 +395,25 @@ function pick(attr, val, list) {
     ${opts.map((n) => `<option value="${esc(n)}"${n === val ? ' selected' : ''}>${esc(n)}</option>`).join('')}
     <option value="__manual">${t('pick.manual')}</option></select>`;
 }
+$('#v-settings').addEventListener('click', (e) => { // пресеты: новый / копия / переименовать / удалить
+  const a = e.target.closest('[data-pa]')?.dataset.pa; if (!a) return; const cur = curPreset(S);
+  const ask = (def) => { const v = prompt(t('prompt.presetName'), def); return v == null || !v.trim() ? null : v.trim(); };
+  if (a === 'new' || a === 'dup') {
+    const name = ask(a === 'dup' ? cur.name + ' 2' : t('defaults.newPreset', { n: S.presets.length + 1 })); if (!name) return;
+    const p = a === 'dup' ? normalizePreset({ ...JSON.parse(JSON.stringify(cur)), id: defaultPreset().id, name }) : defaultPreset(name);
+    S.presets.push(p); S.activePreset = p.id; applyPreset();
+  } else if (a === 'ren') { const name = ask(cur.name); if (!name) return; cur.name = name; persist(); renderPresetName(); renderSettings(); }
+  else if (a === 'del' && S.presets.length > 1 && confirm(t('confirm.deletePreset', { name: cur.name }))) {
+    S.presets = S.presets.filter((p) => p !== cur); S.activePreset = S.presets[0].id; applyPreset();
+  }
+});
 $('#v-settings').addEventListener('click', (e) => { // цвет ячейки -> всплывающий выбор
   const b = e.target.closest('[data-color]'); if (!b) return; const i = +b.dataset.color;
   openColorPicker(S.cells[i].color, (hex) => { S.cells[i].color = hex; persist(); renderSettings(); });
 });
 $('#v-settings').addEventListener('change', (e) => {
   const el = e.target; let val = el.type === 'checkbox' ? el.checked : el.type === 'number' ? +el.value : el.value;
+  if (el.id === 'presetSel') { S.activePreset = val; applyPreset(); return; }
   if (val === '__manual') { const v = prompt(t('prompt.manualName')); if (v == null) { renderSettings(); return; } val = v.trim(); }
   if (el.dataset.scn != null) { const n = el.dataset.scn; const set = new Set(S.sceneButtons); val ? set.add(n) : set.delete(n);
     const order = [...act.sceneOrder, ...S.sceneButtons]; S.sceneButtons = [...new Set(order)].filter((x) => set.has(x)); persist(); renderScenes(); return; }
@@ -394,10 +438,10 @@ $('#btnExport').onclick = () => {
 };
 $('#fileImport').onchange = async (e) => {
   const f = e.target.files[0]; if (!f) return;
-  try { S = normalize(JSON.parse(await f.text())); active.clear(); persist(); connect(); renderSettings(); toast(t('toast.importOk')); } catch (err) { toast(t('toast.importErr', { msg: err.message }), true); }
+  try { S = normalize(JSON.parse(await f.text())); persist(); connect(); applyPreset(); renderSettings(); toast(t('toast.importOk')); } catch (err) { toast(t('toast.importErr', { msg: err.message }), true); }
   e.target.value = '';
 };
-$('#btnReset').onclick = () => { if (confirm(t('confirm.reset'))) { S = defaultState(); active.clear(); persist(); renderSettings(); location.hash = '#settings'; window.scrollTo(0, 0); } };
+$('#btnReset').onclick = () => { if (confirm(t('confirm.reset'))) { S = defaultState(); applyPreset(); renderSettings(); location.hash = '#settings'; window.scrollTo(0, 0); } };
 $('#btnRescan').onclick = () => act.rebuildIndex().then(() => { renderSettings(); toast(t('toast.rescan', { n: act.index.size })); }).catch((e) => toast(e.message, true));
 
 function renderTimecodes() {
@@ -431,6 +475,6 @@ $('#v-settings').addEventListener('change', async (e) => {
 function refreshTexts() { setPlayBtn(); setMic(micMuted); setBuffer(bufferOn); }
 languages().then((l) => { renderSettings.langs = l; if (location.hash === '#settings') renderSettings(); });
 applyI18n(); refreshTexts();
-renderMatch(); route(); connect();
+renderMatch(); renderPresetName(); route(); connect();
 // версия — из файла VERSION (единственный источник)
 fetch('VERSION').then((r) => r.ok ? r.text() : '').then((v) => { $('#ver').textContent = v.trim() ? 'v' + v.trim() : ''; }).catch(() => {});

@@ -124,5 +124,14 @@
  "defaults.cellLabel": "Оверлей {n}",
  "defaults.counterTemplate": "Матч {n}",
  "settings.scenes.title": "Сцены",
- "settings.scenes.empty": "Нет сцен: нет связи с OBS."
+ "settings.scenes.empty": "Нет сцен: нет связи с OBS.",
+ "settings.preset.title": "Пресет",
+ "settings.preset.new": "Новый",
+ "settings.preset.dup": "Копия",
+ "settings.preset.rename": "Переименовать",
+ "settings.preset.delete": "Удалить",
+ "prompt.presetName": "Название пресета:",
+ "confirm.deletePreset": "Удалить пресет «{name}»?",
+ "defaults.presetName": "Default",
+ "defaults.newPreset": "Пресет {n}"
 }

@@ -124,5 +124,14 @@
  "defaults.cellLabel": "Overlay {n}",
  "defaults.counterTemplate": "Match {n}",
  "settings.scenes.title": "Scenes",
- "settings.scenes.empty": "No scenes: no connection to OBS."
+ "settings.scenes.empty": "No scenes: no connection to OBS.",
+ "settings.preset.title": "Preset",
+ "settings.preset.new": "New",
+ "settings.preset.dup": "Duplicate",
+ "settings.preset.rename": "Rename",
+ "settings.preset.delete": "Delete",
+ "prompt.presetName": "Preset name:",
+ "confirm.deletePreset": "Delete preset «{name}»?",
+ "defaults.presetName": "Default",
+ "defaults.newPreset": "Preset {n}"
 }
