@@ -2,7 +2,7 @@ import { t } from './i18n.js';
 // Слой действий: UI вызывает только эти функции, а не OBS напрямую.
 // В v2 сюда добавятся действия для локальных Browser Source (obs.broadcast).
 export class Actions extends EventTarget {
-  constructor(obs, getState) { super(); this.obs = obs; this.getState = getState; this.index = new Map(); this.active = new Map(); this.lastReplay = null; this.scenes = []; this.sceneOrder = []; this.inputs = []; }
+  constructor(obs, getState) { super(); this.obs = obs; this.getState = getState; this.index = new Map(); this.active = new Map(); this.lastReplay = null; this.scenes = []; this.sceneOrder = []; this.inputs = []; this.kinds = new Map(); }
   async rebuildIndex() {
     const idx = new Map();
     const add = (name, ref) => { if (!idx.has(name)) idx.set(name, []); idx.get(name).push(ref); };

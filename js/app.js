@@ -206,7 +206,7 @@ function cellHTML(c, i) {
   if (c.type === 'counter') sub = `<div class="ctr"><button class="cbtn" data-d="-1" aria-label="${t('cell.minus')}">−</button><b>${esc(c.counterValue)}</b><button class="cbtn" data-d="1" aria-label="${t('cell.plus')}">+</button></div>`;
   if (st && st.until) sub += `<div class="cd">${Math.ceil((st.until - Date.now()) / 1000)}</div>`;
   else if (st) sub += `<div class="cd">${t('cell.onAir')}</div>`;
-  return `<div class="lbl">${esc(c.label)}</div>${sub}${warn ? `<div class="warn">${warn}</div>` : ''}<div class="num">${i + 1}</div>${c.source && VIDEO_KINDS.has(act.kinds?.get(c.source)) ? '<svg class="vid" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>' : ''}`;
+  return `<div class="lbl">${esc(c.label)}</div>${sub}${warn ? `<div class="warn">${warn}</div>` : ''}<div class="num">${i + 1}${c.source && VIDEO_KINDS.has(act.kinds?.get(c.source)) ? '<svg class="vid" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>' : ''}</div>`;
 }
 // Картинка кнопки: только если галочка стоит, источник есть в OBS и это картинка или видео
 const IMG_KINDS = new Set(['image_source', 'ffmpeg_source', 'vlc_source']);
@@ -537,6 +537,7 @@ $('#v-settings').addEventListener('change', async (e) => {
 function refreshTexts() { setPlayBtn(); setMic(micMuted); setBuffer(bufferOn); }
 languages().then((l) => { renderSettings.langs = l; if (location.hash === '#settings') renderSettings(); });
 applyI18n(); refreshTexts();
-renderMatch(); renderPresetName(); route(); connect();
+connect(); // сначала соединение: ошибка отрисовки не должна его блокировать
+try { renderMatch(); renderPresetName(); route(); } catch (e) { console.error(e); toast(e.message, true); }
 // версия — из файла VERSION (единственный источник)
 fetch('VERSION').then((r) => r.ok ? r.text() : '').then((v) => { $('#ver').textContent = v.trim() ? 'v' + v.trim() : ''; }).catch(() => {});
