@@ -3,7 +3,7 @@
 // (с таймаутом), при ошибке/зависании сети — из кэша. Удачные ответы сети обновляют кэш,
 // так что новая версия с сервера подхватывается при следующем открытии.
 // Добавили/переименовали файл приложения -> впишите его в FILES и увеличьте номер в CACHE.
-const CACHE = 'overlay-pad-1.11.1'; // = файл VERSION; меняйте вместе
+const CACHE = 'overlay-pad-1.11.2'; // = файл VERSION; меняйте вместе
 const NET_TIMEOUT_MS = 2500;
 const FILES = ['./', 'index.html', 'css/styles.css', 'js/app.js', 'js/obs.js', 'js/actions.js', 'js/store.js', 'js/colorpicker.js', 'js/imgcache.js', 'manifest.webmanifest', 'VERSION', 'js/i18n.js', 'i18n/en.json', 'i18n/ru.json', 'i18n/languages.json', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png'];
 
@@ -28,7 +28,7 @@ self.addEventListener('fetch', (e) => {
     let done = false;
     const fallback = (netResp) => { if (done) return; done = true; fromCache(req).then((r) => resolve(r || netResp || Response.error())); };
     const timer = setTimeout(() => fallback(), NET_TIMEOUT_MS); // сеть висит — отдаём кэш, не ждём
-    fetch(req).then((r) => {
+    fetch(req, { cache: 'no-cache' }).then((r) => { // сверка с сервером, мимо устаревшего HTTP-кэша
       clearTimeout(timer);
       if (r.ok) { const cp = r.clone(); caches.open(CACHE).then((c) => c.put(req, cp)); }
       if (done) return;
