@@ -45,8 +45,8 @@ body.reorder .cell{transition:transform .18s ease}.cell.dragging{z-index:5;opaci
 /* индикатор буфера повтора (маленький, не кнопка) */
 .buf{padding:4px 8px;border-radius:6px;background:#333;font-size:12px;font-weight:600;cursor:pointer}.buf.on{background:#1f5f33}.buf.off{background:#a3262a}
 /* номер матча в шапке */
-.match{display:flex;align-items:center;gap:6px;background:#232a37;border-radius:12px;padding:4px}.match button{font-size:26px;font-weight:800;min-width:52px;min-height:48px;padding:0;background:#3a4558}
-.match span{font-size:17px;font-weight:700;min-width:70px;text-align:center;font-variant-numeric:tabular-nums}
+.match{display:flex;align-items:center;gap:6px;background:#232a37;border-radius:12px;padding:4px}.match button{font-size:26px;font-weight:800;min-width:44px;min-height:48px;padding:0;background:#3a4558}
+.match span{font-size:17px;font-weight:700;min-width:30px;text-align:center;font-variant-numeric:tabular-nums}
 /* настройки */
 select.pick{max-width:240px;width:100%}.swbtn{width:44px;height:36px;padding:0;border:2px solid #fff6;border-radius:8px}
 details{display:inline}details summary{cursor:pointer;color:#7fb2ff;display:inline}details[open]{display:block;margin-top:4px}
@@ -63,7 +63,8 @@ details{display:inline}details summary{cursor:pointer;color:#7fb2ff;display:inli
 .ver{text-align:center;font-size:12px;opacity:.5;margin:4px 0 24px}
 input.miss{border-color:#d9a400}.warnsm{font-size:11px;color:#ffd36b}
 /* кнопки сцен слева (симметрично страницам справа) */
-#scenes{width:112px;display:flex;flex-direction:column;gap:6px;padding:8px 0 8px 6px;overflow-y:auto;touch-action:pan-y}#scenes[hidden]{display:none}
+.left{width:112px;display:flex;flex-direction:column;gap:6px;padding:8px 0 8px 6px;min-height:0}.left #btnMic,.left .tc{flex:0 0 auto;text-align:center}.left .tc{font-size:13px;padding:7px 10px;background:#232a37}
+#scenes{display:flex;flex-direction:column;gap:6px;overflow-y:auto;touch-action:pan-y;min-height:0;flex:0 1 auto}#scenes[hidden]{display:none}
 #scenes button{padding:12px 6px;font-size:14px;font-weight:600;line-height:1.2;word-break:break-word;background:#232a37;border:2px solid transparent;flex:0 0 auto}
 #scenes button.cur{background:#3b82f6;border-color:#9cc2ff}#scenes button.miss{opacity:.5;border-style:dashed;border-color:#d9a400}
 .chk label.missl{opacity:.6;color:#ffd36b}
