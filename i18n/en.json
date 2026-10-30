@@ -142,5 +142,6 @@
  "backup.open": "Open",
  "backup.close": "Close",
  "backup.copied": "Copied",
- "backup.copyFail": "Couldn't copy — select the text manually"
+ "backup.copyFail": "Couldn't copy — select the text manually",
+ "rescan.progress": "Syncing images: {n} of {total}"
 }

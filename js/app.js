@@ -25,7 +25,7 @@ function toast(msg, err) { const el = $('#toast'); el.textContent = msg; el.clas
 obs.addEventListener('status', async (e) => {
   const st = e.detail.status; const el = $('#conn');
   el.className = 'conn ' + st; el.textContent = { connected: 'OBS ✓', connecting: 'OBS …', disconnected: 'OBS ✕', error: 'OBS ✕' }[st];
-  if (st === 'connected') { renderSettings.mic = null; try { await act.rebuildIndex(); await poll(); await refreshScene(); await syncActive(); await ensureBuffer(); refreshMic(); pushMatch(); } catch (err) { toast(err.message, true); } }
+  if (st === 'connected') { renderSettings.mic = null; try { await act.rebuildIndex(); await detectAudio(); await poll(); await refreshScene(); await syncActive(); await ensureBuffer(); refreshMic(); pushMatch(); } catch (err) { toast(err.message, true); } }
   else { setBuffer(null); setMic(null); curScene = null; }
   renderGrid();
 });
@@ -206,11 +206,20 @@ function cellHTML(c, i) {
   if (c.type === 'counter') sub = `<div class="ctr"><button class="cbtn" data-d="-1" aria-label="${t('cell.minus')}">−</button><b>${esc(c.counterValue)}</b><button class="cbtn" data-d="1" aria-label="${t('cell.plus')}">+</button></div>`;
   if (st && st.until) sub += `<div class="cd">${Math.ceil((st.until - Date.now()) / 1000)}</div>`;
   else if (st) sub += `<div class="cd">${t('cell.onAir')}</div>`;
-  return `<div class="lbl">${esc(c.label)}</div>${sub}${warn ? `<div class="warn">${warn}</div>` : ''}<div class="num">${i + 1}${c.source && VIDEO_KINDS.has(act.kinds?.get(c.source)) ? '<svg class="vid" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>' : ''}</div>`;
+  return `<div class="lbl">${esc(c.label)}</div>${sub}${warn ? `<div class="warn">${warn}</div>` : ''}<div class="num">${i + 1}${c.source && VIDEO_KINDS.has(act.kinds?.get(c.source)) ? (audioSrc.has(c.source) ? ICON_NOTE : ICON_PLAY) : ''}</div>`;
 }
 // Картинка кнопки: только если галочка стоит, источник есть в OBS и это картинка или видео
 const IMG_KINDS = new Set(['image_source', 'ffmpeg_source', 'vlc_source']);
 const VIDEO_KINDS = new Set(['ffmpeg_source', 'vlc_source']);
+const ICON_PLAY = '<svg class="vid" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>';
+const ICON_NOTE = '<svg class="vid" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/></svg>';
+// аудио (mp3, wav…) — по расширению файла в настройках медиаисточника: кадра нет, значок ноты
+const AUDIO_EXT = /\.(mp3|wav|ogg|oga|opus|flac|m4a|aac|wma|aif|aiff)$/i;
+const audioSrc = new Set();
+async function isAudio(n) { try { const { inputSettings: st } = await obs.call('GetInputSettings', { inputName: n });
+  const files = [st.local_file, ...(st.playlist || []).map((p) => p.value)].filter(Boolean);
+  const a = files.length > 0 && files.every((f) => AUDIO_EXT.test(f)); if (a) audioSrc.add(n); else audioSrc.delete(n); return a; } catch { return false; } }
+async function detectAudio() { for (const n of new Set(S.cells.filter((c) => c.source && VIDEO_KINDS.has(act.kinds.get(c.source))).map((c) => c.source))) await isAudio(n); }
 function cellImg(c) {
   if (!c.image || c.type === 'counter' || c.type === 'replay' || !c.source) return '';
   if (obs.identified && act.kinds && !IMG_KINDS.has(act.kinds.get(c.source))) return '';
@@ -484,21 +493,20 @@ async function refreshImages() {
   const dur = new Map(S.cells.filter((c) => c.source).map((c) => [c.source, +c.duration || 0]));
   let ok = 0; const diag = []; const t0 = Date.now(); let sceneErr = '';
   const line = (name, L) => `${name}: ${L.live ? 'LIVE' : (L.copy ? 'copy ok' + (L.filters ? ' +' + L.filters + ' filters' : '') + ' · ' : 'copy NO · ') + (L.played ? 'PLAY ok' : 'PLAY no') + (L.restarted ? ' +RESTART' : '')}${L.state ? ' [' + L.state + ']' : ''} · ${L.blank === null ? 'no frame' : L.blank ? 'BLANK' : 'frame ok'}${L.err ? ' · ERR ' + L.err : ''} · ${L.ms} ms`;
+  let doneN = 0; const total = names.length;
+  const prog = () => { const el = $('#toast'); clearTimeout(toast.h); el.className = 'show'; el.textContent = t('rescan.progress', { n: doneN, total }); };
+  if (total) prog();
   const one = async (name) => { try {
     let uri;
     if (VIDEO_KINDS.has(act.kinds.get(name))) { const r = await act.videoFrame(name, dur.get(name), isBlank); uri = r.uri; diag.push(line(name, r.log)); }
     else { // прямой снимок (картинка): одна повторная попытка через 300 мс
       try { uri = await act.screenshot(name); } catch { await new Promise((r) => setTimeout(r, 300)); uri = await act.screenshot(name); } }
     if (uri && !(await isBlank(uri))) { await putImage(name, uri); ok++; } }
-    catch (e) { diag.push(`${name} [${act.kinds.get(name) || '?'}]: direct screenshot failed (after retry) · ${e.message}`); } };
-  // аудио (mp3, wav…) — по расширению файла в настройках источника: кадра у них нет, пропускаем
-  const AUDIO_EXT = /\.(mp3|wav|ogg|oga|opus|flac|m4a|aac|wma|aif|aiff)$/i;
-  const isAudio = async (n) => { try { const { inputSettings: st } = await obs.call('GetInputSettings', { inputName: n });
-    const files = [st.local_file, ...(st.playlist || []).map((p) => p.value)].filter(Boolean);
-    return files.length > 0 && files.every((f) => AUDIO_EXT.test(f)); } catch { return false; } };
+    catch (e) { diag.push(`${name} [${act.kinds.get(name) || '?'}]: direct screenshot failed (after retry) · ${e.message}`); }
+    finally { doneN++; prog(); } };
   const vidNames = [];
   for (const n of names.filter((x) => VIDEO_KINDS.has(act.kinds.get(x)))) {
-    if (await isAudio(n)) diag.push(`${n}: audio, skipped`); else vidNames.push(n); }
+    if (await isAudio(n)) { diag.push(`${n}: audio, skipped`); doneN++; prog(); } else vidNames.push(n); }
   const other = names.filter((n) => !VIDEO_KINDS.has(act.kinds.get(n)));
   try {
     for (const name of other) await one(name);
