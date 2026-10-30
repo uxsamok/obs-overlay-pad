@@ -92,11 +92,14 @@ export class Actions extends EventTarget {
           log.filters++; } catch (e) { log.err = (log.err ? log.err + '; ' : '') + 'filter ' + f.filterName + ': ' + e.message; } } } catch {}
       await this.obs.call('TriggerMediaInputAction', { inputName: tmp, mediaAction: A + 'PLAY' }); log.played = true;
       // опрос кадра каждые ~120 мс, пока не перестанет быть пустым
+      // ошибка отдельной попытки (копия ещё не отрисована) — не ошибка, если потом кадр получен
+      let pollErr = '';
       for (const end = Date.now() + maxMs; ;) {
-        try { uri = await this.screenshot(tmp, name); log.blank = blank ? await blank(uri) : false; } catch (e) { log.err = e.message; }
+        try { uri = await this.screenshot(tmp, name); log.blank = blank ? await blank(uri) : false; pollErr = ''; } catch (e) { pollErr = e.message; }
         if (log.blank === false || Date.now() >= end) break;
         await sleep(120);
       }
+      if (pollErr && log.blank !== false) log.err = (log.err ? log.err + '; ' : '') + 'frame: ' + pollErr;
       try { const st = await this.obs.call('GetMediaInputStatus', { inputName: tmp }); log.state = (st.mediaState || '').replace('OBS_MEDIA_STATE_', ''); } catch {}
     } catch (e) { log.err = e.message; }
     finally { if (made) { try { await this.obs.call('RemoveInput', { inputName: tmp }); } catch (e) { log.err = (log.err ? log.err + '; ' : '') + 'remove: ' + e.message; } } }
