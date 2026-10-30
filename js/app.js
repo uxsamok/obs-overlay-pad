@@ -337,7 +337,7 @@ $('#btnMic').onclick = async () => {
 $('#gtimer').onclick = () => { if (gameTimer && confirm(t('confirm.stopGameTimer'))) { gameTimer = null; tickGameTimer(); } };
 
 setInterval(() => {
-  $('#clock').textContent = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  $('#clock').textContent = new Date().toLocaleTimeString('ru-RU');
   const ind = $('#live'); const el = elapsed();
   ind.className = 'live' + (live.streaming ? ' on' : '');
   ind.textContent = t(live.streaming ? 'hdr.live' : 'hdr.notLive');
