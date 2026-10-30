@@ -483,7 +483,7 @@ async function refreshImages() {
     && IMG_KINDS.has(act.kinds.get(c.source))).map((c) => c.source))];
   const dur = new Map(S.cells.filter((c) => c.source).map((c) => [c.source, +c.duration || 0]));
   let ok = 0; const diag = []; const t0 = Date.now(); let sceneErr = '';
-  const line = (name, L) => `${name}: ${L.live ? 'LIVE' : (L.copy ? 'copy ok' + (L.filters ? ' +' + L.filters + ' filters' : '') + ' · ' : 'copy NO · ') + (L.played ? 'PLAY ok' : 'PLAY no')}${L.state ? ' [' + L.state + ']' : ''} · ${L.blank === null ? 'no frame' : L.blank ? 'BLANK' : 'frame ok'}${L.err ? ' · ERR ' + L.err : ''} · ${L.ms} ms`;
+  const line = (name, L) => `${name}: ${L.live ? 'LIVE' : (L.copy ? 'copy ok' + (L.filters ? ' +' + L.filters + ' filters' : '') + ' · ' : 'copy NO · ') + (L.played ? 'PLAY ok' : 'PLAY no') + (L.restarted ? ' +RESTART' : '')}${L.state ? ' [' + L.state + ']' : ''} · ${L.blank === null ? 'no frame' : L.blank ? 'BLANK' : 'frame ok'}${L.err ? ' · ERR ' + L.err : ''} · ${L.ms} ms`;
   const one = async (name) => { try {
     let uri;
     if (VIDEO_KINDS.has(act.kinds.get(name))) { const r = await act.videoFrame(name, dur.get(name), isBlank); uri = r.uri; diag.push(line(name, r.log)); }

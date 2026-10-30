@@ -97,10 +97,15 @@ export class Actions extends EventTarget {
       for (const end = Date.now() + maxMs; ;) {
         try { uri = await this.screenshot(tmp, name); log.blank = blank ? await blank(uri) : false; pollErr = ''; } catch (e) { pollErr = e.message; }
         if (log.blank === false || Date.now() >= end) break;
+        // копия не стартовала (STOPPED/NONE): один раз пробуем RESTART
+        if (!log.restarted && Date.now() > end - maxMs + 400) { try {
+          const { mediaState: ms } = await this.obs.call('GetMediaInputStatus', { inputName: tmp });
+          if (/STOPPED|NONE/.test(ms || '')) { await this.obs.call('TriggerMediaInputAction', { inputName: tmp, mediaAction: A + 'RESTART' }); log.restarted = true; } } catch {} }
         await sleep(120);
       }
       if (pollErr && log.blank !== false) log.err = (log.err ? log.err + '; ' : '') + 'frame: ' + pollErr;
       try { const st = await this.obs.call('GetMediaInputStatus', { inputName: tmp }); log.state = (st.mediaState || '').replace('OBS_MEDIA_STATE_', ''); } catch {}
+      if (log.blank !== false && /STOPPED|NONE/.test(log.state)) log.err = 'file did not start (check path / file in OBS)' + (log.err ? '; ' + log.err : '');
     } catch (e) { log.err = e.message; }
     finally { if (made) { try { await this.obs.call('RemoveInput', { inputName: tmp }); } catch (e) { log.err = (log.err ? log.err + '; ' : '') + 'remove: ' + e.message; } } }
     return done(uri);
