@@ -518,15 +518,15 @@ async function refreshImages() {
   if (total) prog();
   const one = async (name) => { try {
     let uri;
-    if (VIDEO_KINDS.has(act.kinds.get(name))) { const r = await act.videoFrame(name, dur.get(name), isBlank); uri = r.uri; diag.push(line(name, r.log)); }
+    if (VIDEO_KINDS.has(act.kinds.get(name))) { const r = await act.videoFrame(name, dur.get(name), isBlank); uri = r.uri; if (r.log.err || r.log.blank !== false) diag.push(line(name, r.log)); }
     else { // прямой снимок (картинка): одна повторная попытка через 300 мс
       try { uri = await act.screenshot(name); } catch { await new Promise((r) => setTimeout(r, 300)); uri = await act.screenshot(name); } }
-    if (uri && !(await isBlank(uri))) { await putImage(name, uri); ok++; } }
+    if (uri && !(await isBlank(uri))) { await putImage(name, uri); ok++; } else diag.push(`${name}: empty frame (BLANK)`); }
     catch (e) { diag.push(`${name} [${act.kinds.get(name) || '?'}]: direct screenshot failed (after retry) · ${e.message}`); }
     finally { doneN++; prog(); } };
   const vidNames = [];
   for (const n of names.filter((x) => VIDEO_KINDS.has(act.kinds.get(x)))) {
-    if (await isAudio(n)) { diag.push(`${n}: audio, skipped`); doneN++; prog(); } else vidNames.push(n); }
+    if (await isAudio(n)) { doneN++; prog(); } else vidNames.push(n); }
   const other = names.filter((n) => !VIDEO_KINDS.has(act.kinds.get(n)));
   try {
     for (const name of other) await one(name);
@@ -535,9 +535,9 @@ async function refreshImages() {
     await Promise.all(Array.from({ length: Math.min(4, queue.length) }, async () => { while (queue.length) await one(queue.shift()); }));
   } finally { try { sceneErr = await act.thumbEnd(); } catch (e) { sceneErr = e.message; } }
   if (sceneErr) diag.push('service scene not removed: ' + sceneErr);
-  if (vidNames.length) diag.push(`total: ${Date.now() - t0} ms`);
-  const vids = S.cells.filter((c) => c.source && VIDEO_KINDS.has(act.kinds.get(c.source)));
-  alert('Video frames (diagnostics):\n\n' + (diag.length ? diag.join('\n') : `No video cells with Image on (video cells: ${vids.length}, with Image on: ${vids.filter((c) => c.image).length})`));
+  // Отчёт: только источники с ошибками, внизу — общее время синхронизации
+  const secs = ((Date.now() - t0) / 1000).toFixed(1);
+  alert((diag.length ? `Errors (${diag.length}):\n\n` + diag.join('\n') : `No errors · ${ok} of ${total} images updated`) + `\n\nTotal time: ${secs} s`);
   return ok;
 }
 $('#btnRescan').onclick = () => act.rebuildIndex().then(async () => { renderSettings(); let n = 0; try { n = await refreshImages(); } catch (e) { alert('Image refresh error: ' + e.message); } renderGrid();
