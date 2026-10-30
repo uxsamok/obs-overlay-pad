@@ -208,10 +208,12 @@ function cellHTML(c, i) {
   else if (st) sub += `<div class="cd">${t('cell.onAir')}</div>`;
   return `<div class="lbl">${esc(c.label)}</div>${sub}${warn ? `<div class="warn">${warn}</div>` : ''}<div class="num">${i + 1}</div>`;
 }
-// Картинка кнопки: только если галочка стоит, источник есть в OBS и это image_source
+// Картинка кнопки: только если галочка стоит, источник есть в OBS и это картинка или видео
+const IMG_KINDS = new Set(['image_source', 'ffmpeg_source', 'vlc_source']);
+const VIDEO_KINDS = new Set(['ffmpeg_source', 'vlc_source']);
 function cellImg(c) {
   if (!c.image || c.type === 'counter' || c.type === 'replay' || !c.source) return '';
-  if (obs.identified && act.kinds && act.kinds.get(c.source) !== 'image_source') return '';
+  if (obs.identified && act.kinds && !IMG_KINDS.has(act.kinds.get(c.source))) return '';
   return images.get(c.source) || '';
 }
 function cellStyle(c) { const img = cellImg(c);
@@ -453,12 +455,24 @@ $('#fileImport').onchange = async (e) => {
   e.target.value = '';
 };
 $('#btnReset').onclick = () => { if (confirm(t('confirm.reset'))) { S = defaultState(); applyPreset(); renderSettings(); location.hash = '#settings'; window.scrollTo(0, 0); } };
+// Пустой кадр (весь прозрачный или одноцветный, например чёрный) — не сохраняем
+function isBlank(uri) {
+  return new Promise((res) => { const im = new Image();
+    im.onload = () => { try { const cv = document.createElement('canvas'); cv.width = 32; cv.height = 32; const x = cv.getContext('2d');
+      x.drawImage(im, 0, 0, 32, 32); const d = x.getImageData(0, 0, 32, 32).data; let mn = 255, mx = 0, a = 0;
+      for (let i = 0; i < d.length; i += 4) { const v = d[i] + d[i + 1] + d[i + 2]; mn = Math.min(mn, v); mx = Math.max(mx, v); a = Math.max(a, d[i + 3]); }
+      res(a < 8 || mx - mn < 12); } catch { res(false); } };
+    im.onerror = () => res(true); im.src = uri; });
+}
 // Скриншоты картинок для кнопок: по одному, ошибка одного источника не мешает остальным
 async function refreshImages() {
   const names = [...new Set(S.cells.filter((c) => c.image && c.source && c.type !== 'counter' && c.type !== 'replay'
-    && act.kinds.get(c.source) === 'image_source').map((c) => c.source))];
+    && IMG_KINDS.has(act.kinds.get(c.source))).map((c) => c.source))];
+  const dur = new Map(S.cells.filter((c) => c.source).map((c) => [c.source, +c.duration || 0]));
   let ok = 0;
-  for (const name of names) { try { const uri = await act.screenshot(name); if (uri) { await putImage(name, uri); ok++; } } catch {} }
+  for (const name of names) { try {
+    const uri = VIDEO_KINDS.has(act.kinds.get(name)) ? await act.videoFrame(name, dur.get(name)) : await act.screenshot(name);
+    if (uri && !(await isBlank(uri))) { await putImage(name, uri); ok++; } } catch {} }
   return ok;
 }
 $('#btnRescan').onclick = () => act.rebuildIndex().then(async () => { renderSettings(); const n = await refreshImages(); renderGrid();

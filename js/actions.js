@@ -35,6 +35,27 @@ export class Actions extends EventTarget {
     const r = await this.obs.call('GetSourceScreenshot', { sourceName: name, imageFormat: 'png', imageWidth: w, imageHeight: h });
     return r.imageData;
   }
+  // Кадр из середины видео (ffmpeg_source / vlc_source). Безопасно для эфира:
+  // источник в программе (videoActive) не перематываем, видимость/воспроизведение не трогаем,
+  // play не вызываем, позицию возвращаем как было.
+  async videoFrame(name, durSec) {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    let act = null; try { act = await this.obs.call('GetSourceActive', { sourceName: name }); } catch {}
+    if (act && act.videoActive) return this.screenshot(name);
+    let st = null; try { st = await this.obs.call('GetMediaInputStatus', { inputName: name }); } catch {}
+    const len = st && st.mediaDuration > 0 ? st.mediaDuration : (durSec > 0 ? durSec * 1000 : 0);
+    const state = st && st.mediaState || '';
+    const canSeek = len > 0 && /PLAYING|PAUSED/.test(state); // stopped/ended/none: медиа может быть закрыто — не трогаем
+    if (!canSeek) return this.screenshot(name);
+    const prev = st.mediaCursor;
+    try {
+      await this.obs.call('SetMediaInputCursor', { inputName: name, mediaCursor: Math.floor(len / 2) });
+      await sleep(250); // декодер успевает выдать кадр после перемотки
+      return await this.screenshot(name);
+    } finally {
+      if (prev != null) { try { await this.obs.call('SetMediaInputCursor', { inputName: name, mediaCursor: prev }); } catch {} }
+    }
+  }
   lookup(name) {
     const refs = this.index.get(name) || [];
     if (!refs.length) throw new Error(t('err.notFound', { name }));
