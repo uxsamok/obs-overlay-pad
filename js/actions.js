@@ -40,24 +40,40 @@ export class Actions extends EventTarget {
   // перемотка на середину -> скриншот -> STOP всегда (в finally). Позицию не восстанавливаем.
   // 1.11.1 (диагностика): скрытое видео — PLAY, без перемотки, первый кадр, STOP. Возвращает { uri, log }
   // v1.12.0: скрытые видео OBS не рендерит -> временная копия в служебной сцене (оригинал не трогаем)
-  async thumbBegin() {
-    const SC = 'Overlay Pad (thumbnails)'; this.thumbScene = SC; this.thumbN = 0;
+  // v1.13.0: опрос скриншота вместо фиксированных пауз; служебная сцена удаляется надёжно
+  async thumbClean() {
     try { const { inputs } = await this.obs.call('GetInputList');
       for (const x of inputs) if (x.inputName.startsWith('__pad_thumb_')) { try { await this.obs.call('RemoveInput', { inputName: x.inputName }); } catch {} } } catch {}
-    const { scenes } = await this.obs.call('GetSceneList');
+  }
+  async thumbBegin() {
+    const SC = 'Overlay Pad (thumbnails)'; this.thumbScene = SC; this.thumbN = 0; this.thumbErr = '';
+    await this.thumbClean();
+    let { scenes } = await this.obs.call('GetSceneList');
+    if (scenes.some((x) => x.sceneName === SC)) { try { await this.obs.call('RemoveScene', { sceneName: SC }); } catch {} ({ scenes } = await this.obs.call('GetSceneList')); }
     if (!scenes.some((x) => x.sceneName === SC)) await this.obs.call('CreateScene', { sceneName: SC });
   }
-  async thumbEnd() { if (!this.thumbScene) return; try { await this.obs.call('RemoveScene', { sceneName: this.thumbScene }); } catch {} this.thumbScene = null; }
+  async thumbEnd() {
+    if (!this.thumbScene) return ''; const SC = this.thumbScene; this.thumbScene = null;
+    await this.thumbClean();
+    let err = '';
+    for (let i = 0; i < 2; i++) {
+      try { await this.obs.call('RemoveScene', { sceneName: SC }); err = ''; break; }
+      catch (e) { err = e.message; if (i === 0) await new Promise((r) => setTimeout(r, 300)); }
+    }
+    this.thumbErr = err; return err;
+  }
   async videoFrame(name, durSec, blank) {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-    const log = { name, live: false, copy: false, played: false, state: '', err: '', blank: null };
+    const t0 = Date.now();
+    const log = { name, live: false, copy: false, played: false, state: '', err: '', blank: null, ms: 0 };
+    const done = (uri) => { log.ms = Date.now() - t0; return { uri, log }; };
     let live = null; try { live = await this.obs.call('GetSourceActive', { sourceName: name }); } catch {}
-    if (live && live.videoActive) { log.live = true; const uri = await this.screenshot(name); log.blank = blank ? await blank(uri) : null; return { uri, log }; }
+    if (live && live.videoActive) { log.live = true; const uri = await this.screenshot(name); log.blank = blank ? await blank(uri) : null; return done(uri); }
     if (!this.thumbScene) await this.thumbBegin();
     const vlc = this.kinds && this.kinds.get(name) === 'vlc_source';
-    const openMs = vlc ? 4000 : 1500, settleMs = vlc ? 800 : 300;
+    const maxMs = vlc ? 4000 : 1500;
     const A = 'OBS_WEBSOCKET_MEDIA_INPUT_ACTION_';
-    const tmp = '__pad_thumb_' + (++this.thumbN) + '_' + Date.now().toString(36);
+    const tmp = '__pad_thumb_' + (++this.thumbN) + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     let uri = null, made = false;
     try {
       const orig = await this.obs.call('GetInputSettings', { inputName: name });
@@ -67,19 +83,17 @@ export class Actions extends EventTarget {
       made = true; log.copy = true;
       try { await this.obs.call('SetInputMute', { inputName: tmp, inputMuted: true }); } catch {}
       try { await this.obs.call('SetInputAudioMonitorType', { inputName: tmp, monitorType: 'OBS_MONITORING_TYPE_NONE' }); } catch {}
-      await this.obs.call('TriggerMediaInputAction', { inputName: tmp, mediaAction: A + 'PLAY' });
-      for (const end = Date.now() + openMs; Date.now() < end;) {
-        await sleep(100);
-        try { const st = await this.obs.call('GetMediaInputStatus', { inputName: tmp }); log.state = (st.mediaState || '').replace('OBS_MEDIA_STATE_', '');
-          if (/PLAYING/.test(st.mediaState || '')) { log.played = true; break; } } catch (e) { log.err = e.message; }
+      await this.obs.call('TriggerMediaInputAction', { inputName: tmp, mediaAction: A + 'PLAY' }); log.played = true;
+      // опрос кадра каждые ~120 мс, пока не перестанет быть пустым
+      for (const end = Date.now() + maxMs; ;) {
+        try { uri = await this.screenshot(tmp); log.blank = blank ? await blank(uri) : false; } catch (e) { log.err = e.message; }
+        if (log.blank === false || Date.now() >= end) break;
+        await sleep(120);
       }
-      await sleep(settleMs);
-      uri = await this.screenshot(tmp);
-      log.blank = blank ? await blank(uri) : null;
-      if (log.blank) { await sleep(settleMs); uri = await this.screenshot(tmp); log.blank = blank ? await blank(uri) : null; }
+      try { const st = await this.obs.call('GetMediaInputStatus', { inputName: tmp }); log.state = (st.mediaState || '').replace('OBS_MEDIA_STATE_', ''); } catch {}
     } catch (e) { log.err = e.message; }
     finally { if (made) { try { await this.obs.call('RemoveInput', { inputName: tmp }); } catch (e) { log.err = (log.err ? log.err + '; ' : '') + 'remove: ' + e.message; } } }
-    return { uri, log };
+    return done(uri);
   }
   lookup(name) {
     const refs = this.index.get(name) || [];
