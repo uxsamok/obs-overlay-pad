@@ -25,7 +25,7 @@ function toast(msg, err) { const el = $('#toast'); el.textContent = msg; el.clas
 obs.addEventListener('status', async (e) => {
   const st = e.detail.status; const el = $('#conn');
   el.className = 'conn ' + st; el.textContent = { connected: 'OBS ✓', connecting: 'OBS …', disconnected: 'OBS ✕', error: 'OBS ✕' }[st];
-  if (st === 'connected') { renderSettings.mic = null; try { await act.rebuildIndex(); await detectAudio(); await poll(); await refreshScene(); await syncActive(); await ensureBuffer(); refreshMic(); pushMatch(); } catch (err) { toast(err.message, true); } }
+  if (st === 'connected') { renderSettings.mic = null; try { await act.rebuildIndex(); await detectAudio(); await poll(); await refreshScene(); await syncActive(); await refreshReplayBtn(); await ensureBuffer(); refreshMic(); pushMatch(); } catch (err) { toast(err.message, true); } }
   else { setBuffer(null); setMic(null); curScene = null; }
   renderGrid();
 });
@@ -68,6 +68,14 @@ obs.addEventListener('MediaInputPlaybackEnded', (e) => {
 let replayOn = false;
 const replayShown = () => replayOn || [...active.keys()].some((i) => S.cells[i]?.type === 'replay');
 function setPlayBtn() { const b = $('#btnPlay'); b.classList.toggle('on', replayOn); b.textContent = t(replayOn ? 'hdr.hideReplay' : 'hdr.showReplay'); }
+// Кнопка повтора отражает реальную видимость Media Source повтора в OBS, кто бы его ни включил
+function replayRef() { try { return S.replay.mediaSource ? act.lookup(S.replay.mediaSource) : null; } catch { return null; } }
+function syncReplayBtn(sceneName, sceneItemId, on) {
+  const r = replayRef(); if (!r || r.sceneName !== sceneName || r.sceneItemId !== sceneItemId) return;
+  replayOn = on; setPlayBtn();
+  if (!on) for (const [i, st] of [...active]) if (S.cells[i]?.type === 'replay') { clearTimeout(st.timer); active.delete(i); updateCell(i); }
+}
+async function refreshReplayBtn() { if (!obs.identified || !replayRef()) return; try { replayOn = await act.isVisible(S.replay.mediaSource); setPlayBtn(); } catch {} }
 async function playReplay() {
   if (!obs.identified) throw new Error(t('err.noObs'));
   if (!S.replay.mediaSource) throw new Error(t('err.noReplaySource'));
@@ -113,6 +121,7 @@ async function syncActive() {
 // stopCell убирает подсветку до hide().
 obs.addEventListener('SceneItemEnableStateChanged', (e) => {
   const { sceneName, sceneItemId, sceneItemEnabled: on } = e.detail;
+  syncReplayBtn(sceneName, sceneItemId, on);
   S.cells.forEach((c, i) => { const ref = cellRef(c);
     if (!ref || ref.sceneName !== sceneName || ref.sceneItemId !== sceneItemId) return;
     if (on && !active.has(i)) { active.set(i, { source: c.source }); updateCell(i); }
@@ -122,7 +131,7 @@ obs.addEventListener('SceneItemEnableStateChanged', (e) => {
 function clearActive() { for (const st of active.values()) clearTimeout(st.timer); active.clear(); }
 function renderPresetName() { $('#preset').textContent = S.presets.length > 1 ? curPreset(S).name : ''; }
 function applyPreset() {
-  clearActive(); replayOn = false; setPlayBtn(); persist();
+  clearActive(); replayOn = false; setPlayBtn(); refreshReplayBtn(); persist();
   renderMatch(); renderPresetName(); refreshMic(); pushMatch(); renderGrid(); syncActive();
   if (location.hash === '#settings') renderSettings();
 }
