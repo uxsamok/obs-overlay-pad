@@ -489,7 +489,14 @@ async function refreshImages() {
     if (VIDEO_KINDS.has(act.kinds.get(name))) { const r = await act.videoFrame(name, dur.get(name), isBlank); uri = r.uri; diag.push(line(name, r.log)); }
     else uri = await act.screenshot(name);
     if (uri && !(await isBlank(uri))) { await putImage(name, uri); ok++; } } catch (e) { diag.push(`${name}: ERR ${e.message}`); } };
-  const vidNames = names.filter((n) => VIDEO_KINDS.has(act.kinds.get(n)));
+  // аудио (mp3, wav…) — по расширению файла в настройках источника: кадра у них нет, пропускаем
+  const AUDIO_EXT = /\.(mp3|wav|ogg|oga|opus|flac|m4a|aac|wma|aif|aiff)$/i;
+  const isAudio = async (n) => { try { const { inputSettings: st } = await obs.call('GetInputSettings', { inputName: n });
+    const files = [st.local_file, ...(st.playlist || []).map((p) => p.value)].filter(Boolean);
+    return files.length > 0 && files.every((f) => AUDIO_EXT.test(f)); } catch { return false; } };
+  const vidNames = [];
+  for (const n of names.filter((x) => VIDEO_KINDS.has(act.kinds.get(x)))) {
+    if (await isAudio(n)) diag.push(`${n}: audio, skipped`); else vidNames.push(n); }
   const other = names.filter((n) => !VIDEO_KINDS.has(act.kinds.get(n)));
   try {
     for (const name of other) await one(name);
