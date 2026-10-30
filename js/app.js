@@ -487,8 +487,10 @@ async function refreshImages() {
   const one = async (name) => { try {
     let uri;
     if (VIDEO_KINDS.has(act.kinds.get(name))) { const r = await act.videoFrame(name, dur.get(name), isBlank); uri = r.uri; diag.push(line(name, r.log)); }
-    else uri = await act.screenshot(name);
-    if (uri && !(await isBlank(uri))) { await putImage(name, uri); ok++; } } catch (e) { diag.push(`${name}: ERR ${e.message}`); } };
+    else { // прямой снимок (картинка): одна повторная попытка через 300 мс
+      try { uri = await act.screenshot(name); } catch { await new Promise((r) => setTimeout(r, 300)); uri = await act.screenshot(name); } }
+    if (uri && !(await isBlank(uri))) { await putImage(name, uri); ok++; } }
+    catch (e) { diag.push(`${name} [${act.kinds.get(name) || '?'}]: direct screenshot failed (after retry) · ${e.message}`); } };
   // аудио (mp3, wav…) — по расширению файла в настройках источника: кадра у них нет, пропускаем
   const AUDIO_EXT = /\.(mp3|wav|ogg|oga|opus|flac|m4a|aac|wma|aif|aiff)$/i;
   const isAudio = async (n) => { try { const { inputSettings: st } = await obs.call('GetInputSettings', { inputName: n });

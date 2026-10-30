@@ -69,7 +69,9 @@ export class Actions extends EventTarget {
     const log = { name, live: false, copy: false, played: false, state: '', err: '', blank: null, ms: 0 };
     const done = (uri) => { log.ms = Date.now() - t0; return { uri, log }; };
     let live = null; try { live = await this.obs.call('GetSourceActive', { sourceName: name }); } catch {}
-    if (live && live.videoActive) { log.live = true; const uri = await this.screenshot(name); log.blank = blank ? await blank(uri) : null; return done(uri); }
+    if (live && live.videoActive) { log.live = true; let uri = null;
+      for (let i = 0; i < 2 && !uri; i++) { try { uri = await this.screenshot(name); log.blank = blank ? await blank(uri) : null; log.err = ''; } catch (e) { log.err = 'direct screenshot failed: ' + e.message; if (!i) await sleep(300); } }
+      return done(uri); }
     if (!this.thumbScene) await this.thumbBegin();
     const vlc = this.kinds && this.kinds.get(name) === 'vlc_source';
     const maxMs = vlc ? 4000 : 1500;
