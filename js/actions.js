@@ -38,30 +38,29 @@ export class Actions extends EventTarget {
   // Кадр из середины видео (ffmpeg_source / vlc_source). Видимость не трогаем:
   // источник в программе (videoActive) снимаем как есть; иначе PLAY -> ждём PLAYING и длительность ->
   // перемотка на середину -> скриншот -> STOP всегда (в finally). Позицию не восстанавливаем.
+  // 1.11.1 (диагностика): скрытое видео — PLAY, без перемотки, первый кадр, STOP. Возвращает { uri, log }
   async videoFrame(name, durSec, blank) {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const log = { name, live: false, played: false, state: '', err: '', blank: null };
     let live = null; try { live = await this.obs.call('GetSourceActive', { sourceName: name }); } catch {}
-    if (live && live.videoActive) return this.screenshot(name);
+    if (live && live.videoActive) { log.live = true; const uri = await this.screenshot(name); log.blank = blank ? await blank(uri) : null; return { uri, log }; }
     const vlc = this.kinds && this.kinds.get(name) === 'vlc_source';
     const openMs = vlc ? 4000 : 1500, settleMs = vlc ? 800 : 300;
     const A = 'OBS_WEBSOCKET_MEDIA_INPUT_ACTION_';
+    let uri = null;
     try {
       await this.obs.call('TriggerMediaInputAction', { inputName: name, mediaAction: A + 'PLAY' });
-      let len = 0;
       for (const end = Date.now() + openMs; Date.now() < end;) {
         await sleep(100);
-        try { const st = await this.obs.call('GetMediaInputStatus', { inputName: name });
-          if (/PLAYING/.test(st.mediaState || '') && st.mediaDuration > 0) { len = st.mediaDuration; break; } } catch {}
+        try { const st = await this.obs.call('GetMediaInputStatus', { inputName: name }); log.state = (st.mediaState || '').replace('OBS_MEDIA_STATE_', '');
+          if (/PLAYING/.test(st.mediaState || '')) { log.played = true; break; } } catch (e) { log.err = e.message; }
       }
-      if (!(len > 0) && durSec > 0) len = durSec * 1000;
-      if (len > 0) { try { await this.obs.call('SetMediaInputCursor', { inputName: name, mediaCursor: Math.floor(len / 2) }); } catch {} }
       await sleep(settleMs);
-      let uri = await this.screenshot(name);
-      if (blank && uri && await blank(uri)) { await sleep(settleMs); uri = await this.screenshot(name); }
-      return uri;
-    } finally {
-      try { await this.obs.call('TriggerMediaInputAction', { inputName: name, mediaAction: A + 'STOP' }); } catch {}
-    }
+      uri = await this.screenshot(name);
+      log.blank = blank ? await blank(uri) : null;
+    } catch (e) { log.err = e.message; }
+    finally { try { await this.obs.call('TriggerMediaInputAction', { inputName: name, mediaAction: A + 'STOP' }); } catch {} }
+    return { uri, log };
   }
   lookup(name) {
     const refs = this.index.get(name) || [];
