@@ -83,6 +83,12 @@ export class Actions extends EventTarget {
       made = true; log.copy = true;
       try { await this.obs.call('SetInputMute', { inputName: tmp, inputMuted: true }); } catch {}
       try { await this.obs.call('SetInputAudioMonitorType', { inputName: tmp, monitorType: 'OBS_MONITORING_TYPE_NONE' }); } catch {}
+      // фильтры оригинала (хромакей и т.п.) — на копию, в том же порядке и с тем же вкл/выкл
+      try { const { filters } = await this.obs.call('GetSourceFilterList', { sourceName: name }); log.filters = 0;
+        for (const f of filters || []) { try {
+          await this.obs.call('CreateSourceFilter', { sourceName: tmp, filterName: f.filterName, filterKind: f.filterKind, filterSettings: f.filterSettings || {} });
+          if (f.filterEnabled === false) await this.obs.call('SetSourceFilterEnabled', { sourceName: tmp, filterName: f.filterName, filterEnabled: false });
+          log.filters++; } catch (e) { log.err = (log.err ? log.err + '; ' : '') + 'filter ' + f.filterName + ': ' + e.message; } } } catch {}
       await this.obs.call('TriggerMediaInputAction', { inputName: tmp, mediaAction: A + 'PLAY' }); log.played = true;
       // опрос кадра каждые ~120 мс, пока не перестанет быть пустым
       for (const end = Date.now() + maxMs; ;) {
