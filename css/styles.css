@@ -81,3 +81,6 @@ button.off{opacity:.4;cursor:not-allowed}
 .left #btnMic{min-height:64px;font-size:17px;margin-top:14px}.left .tc{margin-top:10px}.left .clock{margin-top:6px}
 .left .rgrp{display:flex;flex-direction:column;gap:10px;border-top:1px solid #394355;padding-top:12px;margin-top:8px}.left .rgrp button{min-height:56px;font-weight:600}.left #btnHide{min-height:48px;margin-top:8px}
 #btnMic.micon{background:#1f7a3c}
+.pickw{position:relative;display:inline-block;max-width:240px;width:100%}.pickw .pick{width:100%}
+.sugg{position:absolute;left:0;right:0;top:100%;z-index:50;max-height:260px;overflow-y:auto;background:#1e1e24;border:1px solid #fff3;border-radius:8px;margin-top:2px}
+.sugg button{display:block;width:100%;text-align:left;min-height:40px;padding:6px 10px;background:none;border:0;border-bottom:1px solid #fff1;color:inherit;font:inherit}

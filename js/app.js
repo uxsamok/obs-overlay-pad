@@ -369,6 +369,7 @@ const modeOpts = () => ['timer', 'toggle'].map((k) => [k, t('mode.' + k)]);
 const sel = (k, opts, v) => `<select data-k="${k}">${opts.map(([a, b]) => `<option value="${a}"${a === v ? ' selected' : ''}>${b}</option>`).join('')}</select>`;
 const box = (title, inner) => `<section class="box"><h3>${title}</h3>${inner}</section>`;
 function renderSettings() {
+  if (document.activeElement?.classList.contains('pick')) { clearTimeout(renderSettings.t2); renderSettings.t2 = setTimeout(renderSettings, 800); return; }
   const v = $('#v-settings');
   const items = [...act.index.keys()].sort((a, b) => a.localeCompare(b)); // всё, что стоит в сценах
   // Ячейки: <input list> — набор текста фильтрует варианты (удобно при многих источниках)
@@ -417,15 +418,24 @@ function renderSettings() {
     <td><input data-k="timecode" type="checkbox"${c.timecode ? ' checked' : ''}></td>
     <td>${c.type === 'counter' || c.type === 'replay' ? '' : `<input data-k="image" type="checkbox"${c.image ? ' checked' : ''} title="${esc(t('settings.cells.imageTitle'))}">`}</td></tr>`).join('');
 }
-// Выбор источника: поле с подсказками (<datalist>) — набор текста фильтрует список источников.
-// Своя datalist на каждое поле; ⚠ если введённого имени нет в OBS.
-let pickN = 0;
+// Выбор источника: поле ввода + собственный список подсказок (не <datalist>: в нём браузер
+// уводит фокус из поля). Набор текста сужает список, фокус всегда остаётся в поле.
 function pick(attr, val, list) {
-  const opts = [...new Set(list || [])].sort((a, b) => a.localeCompare(b)); const id = 'pk' + (++pickN);
+  const opts = [...new Set(list || [])].sort((a, b) => a.localeCompare(b));
   const miss = val && obs.identified && !opts.includes(val);
-  return `<input ${attr} value="${esc(val || '')}" list="${id}" placeholder="${t('settings.typeName')}" autocomplete="off" class="pick${miss ? ' miss' : ''}"${miss ? ` title="${t('settings.missingTitle')}"` : ''}>
-    <datalist id="${id}">${opts.map((n) => `<option value="${esc(n)}">`).join('')}</datalist>${miss ? `<div class="warnsm">${t('settings.missing')}</div>` : ''}`;
+  return `<span class="pickw"><input ${attr} value="${esc(val || '')}" data-opts="${esc(JSON.stringify(opts))}" placeholder="${t('settings.typeName')}" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" class="pick${miss ? ' miss' : ''}"${miss ? ` title="${t('settings.missingTitle')}"` : ''}><div class="sugg" hidden></div></span>${miss ? `<div class="warnsm">${t('settings.missing')}</div>` : ''}`;
 }
+function showSugg(inp) {
+  const box = inp.nextElementSibling, q = inp.value.trim().toLowerCase(), all = JSON.parse(inp.dataset.opts || '[]');
+  const l = q ? [...all.filter((n) => n.toLowerCase().startsWith(q)), ...all.filter((n) => !n.toLowerCase().startsWith(q) && n.toLowerCase().includes(q))] : all;
+  box.innerHTML = l.map((n) => `<button type="button" data-sg="${esc(n)}">${esc(n)}</button>`).join(''); box.hidden = !l.length;
+}
+$('#v-settings').addEventListener('input', (e) => { if (e.target.classList.contains('pick')) showSugg(e.target); });
+$('#v-settings').addEventListener('focusin', (e) => { if (e.target.classList.contains('pick')) showSugg(e.target); });
+$('#v-settings').addEventListener('focusout', (e) => { if (e.target.classList.contains('pick')) setTimeout(() => { const b = e.target.nextElementSibling; if (b) b.hidden = true; }, 150); });
+$('#v-settings').addEventListener('pointerdown', (e) => { if (e.target.closest('[data-sg]')) e.preventDefault(); }); // фокус не уходит из поля
+$('#v-settings').addEventListener('click', (e) => { const b = e.target.closest('[data-sg]'); if (!b) return;
+  const inp = b.parentElement.previousElementSibling; inp.value = b.dataset.sg; b.parentElement.hidden = true; inp.blur(); inp.dispatchEvent(new Event('change', { bubbles: true })); });
 $('#v-settings').addEventListener('click', (e) => { // пресеты: новый / копия / переименовать / удалить
   const a = e.target.closest('[data-pa]')?.dataset.pa; if (!a) return; const cur = curPreset(S);
   const ask = (def) => { const v = prompt(t('prompt.presetName'), def); return v == null || !v.trim() ? null : v.trim(); };
