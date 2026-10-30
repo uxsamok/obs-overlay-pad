@@ -80,3 +80,4 @@ button.off{opacity:.4;cursor:not-allowed}
 .left .clock{font-size:14px;text-align:center;opacity:.75}
 .left #btnMic{min-height:64px;font-size:17px;margin-top:14px}.left .tc{margin-top:10px}.left .clock{margin-top:6px}
 .left .rgrp{display:flex;flex-direction:column;gap:10px;border-top:1px solid #394355;padding-top:12px;margin-top:8px}.left .rgrp button{min-height:56px;font-weight:600}.left #btnHide{min-height:48px;margin-top:8px}
+#btnMic.micon{background:#1f7a3c}

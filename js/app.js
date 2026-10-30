@@ -89,7 +89,7 @@ document.querySelectorAll('#match [data-md]').forEach((b) => b.onclick = () => {
 });
 // Микрофон
 let micMuted = null; // true / false / null (не настроен или нет связи)
-function setMic(m) { micMuted = m; const b = $('#btnMic'); b.classList.toggle('alert', m === true); b.classList.toggle('dim', m == null); b.textContent = t(m === true ? 'hdr.micMuted' : 'hdr.mic'); }
+function setMic(m) { micMuted = m; const b = $('#btnMic'); b.classList.toggle('alert', m === true); b.classList.toggle('dim', m == null); b.classList.toggle('micon', m === false); b.textContent = t(m === true ? 'hdr.micMuted' : 'hdr.mic'); }
 async function refreshMic() { if (!obs.identified || !S.mic.source) return setMic(null); try { setMic(await act.getMute(S.mic.source)); } catch { setMic(null); } }
 obs.addEventListener('InputMuteStateChanged', (e) => { if (e.detail.inputName === S.mic.source) setMic(e.detail.inputMuted); });
 // Оверлеи, видимые в OBS -> подсветка ячеек. Источник ячейки = первая запись индекса (как в act.show/hide).
