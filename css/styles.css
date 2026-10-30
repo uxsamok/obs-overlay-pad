@@ -9,7 +9,7 @@ button:active,.btn:active{filter:brightness(1.4)}.danger,.alert{background:#a326
 main{flex:1;display:flex;min-height:0}#grid{flex:1;overflow-y:auto;scroll-snap-type:y mandatory;touch-action:pan-y}
 .page{height:100%;scroll-snap-align:start;display:grid;grid-template-columns:repeat(var(--cols),1fr);grid-template-rows:repeat(var(--rows),1fr);gap:8px;padding:8px}
 .cell{position:relative;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:6px;overflow:hidden;border:3px solid transparent;transition:border-color .15s,box-shadow .15s}
-.cell .lbl{font-size:clamp(14px,2.2vw,26px);font-weight:600;word-break:break-word}.cell .num{position:absolute;top:4px;left:8px;font-size:11px;opacity:.5}
+.cell .lbl{font-size:clamp(14px,2.2vw,26px);font-weight:600;word-break:break-word}.cell .num{position:absolute;top:4px;left:8px;font-size:14px;font-weight:700;opacity:.9;text-shadow:0 1px 2px #000c;z-index:1}
 .cell .warn{position:absolute;bottom:4px;font-size:11px;color:#ffd36b}.cell.on{border-color:#3dff7a;box-shadow:0 0 18px #3dff7a88 inset}
 .cell .cd{margin-top:4px;font-size:clamp(16px,3vw,34px);font-weight:800;color:#3dff7a;font-variant-numeric:tabular-nums}
 .cell.flash{filter:brightness(1.6)}.ctr{display:flex;width:100%;justify-content:space-between;align-items:center;font-size:30px;font-weight:800}
@@ -68,6 +68,6 @@ input.miss{border-color:#d9a400}.warnsm{font-size:11px;color:#ffd36b}
 #scenes button.cur{background:#3b82f6;border-color:#9cc2ff}#scenes button.miss{opacity:.5;border-style:dashed;border-color:#d9a400}
 .chk label.missl{opacity:.6;color:#ffd36b}
 .prow{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.prow select{min-width:200px}.preset{font-size:12px;opacity:.7;margin-left:6px}
-.cell.img{background-size:cover!important;background-position:center!important;background-repeat:no-repeat!important;border-color:var(--frame,transparent)}
+.cell.img{background-size:contain!important;background-position:center!important;background-repeat:no-repeat!important;border-color:var(--frame,transparent)}
 .cell.img .lbl{background:#000a;padding:2px 8px;border-radius:6px}.cell.img .cd,.cell.img .warn{background:#000a;padding:0 6px;border-radius:6px}
 .cell.img{justify-content:flex-end;padding-bottom:8px}
