@@ -48,7 +48,7 @@ body.reorder .cell{transition:transform .18s ease}.cell.dragging{z-index:5;opaci
 .match{display:flex;align-items:center;gap:6px;background:#232a37;border-radius:12px;padding:4px}.match button{font-size:26px;font-weight:800;min-width:44px;min-height:48px;padding:0;background:#3a4558}
 .match span{font-size:17px;font-weight:700;min-width:30px;text-align:center;font-variant-numeric:tabular-nums}
 /* настройки */
-select.pick{max-width:240px;width:100%}.swbtn{width:44px;height:36px;padding:0;border:2px solid #fff6;border-radius:8px}
+.pick{max-width:240px;width:100%}.swbtn{width:44px;height:36px;padding:0;border:2px solid #fff6;border-radius:8px}
 details{display:inline}details summary{cursor:pointer;color:#7fb2ff;display:inline}details[open]{display:block;margin-top:4px}
 /* окно выбора цвета */
 #cp{position:fixed;inset:0;background:#000a;display:flex;align-items:center;justify-content:center;z-index:50}#cp[hidden]{display:none}

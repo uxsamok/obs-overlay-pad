@@ -417,14 +417,14 @@ function renderSettings() {
     <td><input data-k="timecode" type="checkbox"${c.timecode ? ' checked' : ''}></td>
     <td>${c.type === 'counter' || c.type === 'replay' ? '' : `<input data-k="image" type="checkbox"${c.image ? ' checked' : ''} title="${esc(t('settings.cells.imageTitle'))}">`}</td></tr>`).join('');
 }
-// Выбор источника: обычный <select> со ВСЕМИ вариантами из OBS (у <datalist> Chrome прячет
-// варианты, не содержащие уже введённый текст). Плюс текущее значение и ручной ввод.
+// Выбор источника: поле с подсказками (<datalist>) — набор текста фильтрует список источников.
+// Своя datalist на каждое поле; ⚠ если введённого имени нет в OBS.
+let pickN = 0;
 function pick(attr, val, list) {
-  const opts = [...new Set(list || [])];
-  return `<select ${attr} class="pick"><option value="">${t('pick.none')}</option>
-    ${val && !opts.includes(val) ? `<option value="${esc(val)}" selected>${esc(val)}${obs.identified ? ' ' + t('pick.missing') : ''}</option>` : ''}
-    ${opts.map((n) => `<option value="${esc(n)}"${n === val ? ' selected' : ''}>${esc(n)}</option>`).join('')}
-    <option value="__manual">${t('pick.manual')}</option></select>`;
+  const opts = [...new Set(list || [])].sort((a, b) => a.localeCompare(b)); const id = 'pk' + (++pickN);
+  const miss = val && obs.identified && !opts.includes(val);
+  return `<input ${attr} value="${esc(val || '')}" list="${id}" placeholder="${t('settings.typeName')}" autocomplete="off" class="pick${miss ? ' miss' : ''}"${miss ? ` title="${t('settings.missingTitle')}"` : ''}>
+    <datalist id="${id}">${opts.map((n) => `<option value="${esc(n)}">`).join('')}</datalist>${miss ? `<div class="warnsm">${t('settings.missing')}</div>` : ''}`;
 }
 $('#v-settings').addEventListener('click', (e) => { // пресеты: новый / копия / переименовать / удалить
   const a = e.target.closest('[data-pa]')?.dataset.pa; if (!a) return; const cur = curPreset(S);
