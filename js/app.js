@@ -446,8 +446,21 @@ $('#v-settings').addEventListener('change', (e) => {
   persist(); if (['type', 'label', 'duration', 'source'].includes(el.dataset.k) || el.dataset.g) renderSettings();
 });
 $('#btnExport').onclick = () => {
-  const blob = new Blob([JSON.stringify(S, null, 2)], { type: 'application/json' }); const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob); a.download = `obs-overlay-pad-${new Date().toISOString().slice(0, 10)}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  const json = JSON.stringify(S, null, 2); const fname = `obs-overlay-pad-${new Date().toISOString().slice(0, 10)}.json`;
+  const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+  const a = document.createElement('a'); a.href = url; a.download = fname; a.style.display = 'none';
+  document.body.appendChild(a); a.click(); setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 60000);
+  // запасной вариант для iPad: текст бэкапа, «Скопировать» и «Открыть»
+  const d = document.createElement('dialog'); d.className = 'backup';
+  d.innerHTML = `<p>${esc(t('backup.fallback', { file: fname }))}</p><textarea readonly></textarea>
+    <div class="row"><button data-b="copy">${t('backup.copy')}</button><button data-b="open">${t('backup.open')}</button><button data-b="close">${t('backup.close')}</button></div>`;
+  const ta = d.querySelector('textarea'); ta.value = json; document.body.appendChild(d);
+  d.addEventListener('close', () => d.remove());
+  d.onclick = (e) => { const b = e.target.dataset && e.target.dataset.b; if (!b) return;
+    if (b === 'close') d.close();
+    if (b === 'copy') { ta.focus(); ta.select(); ta.setSelectionRange(0, json.length); let ok = false; try { ok = document.execCommand('copy'); } catch {} toast(t(ok ? 'backup.copied' : 'backup.copyFail'), !ok); }
+    if (b === 'open') { const u = URL.createObjectURL(new Blob([json], { type: 'text/plain' })); if (!window.open(u, '_blank')) location.href = u; setTimeout(() => URL.revokeObjectURL(u), 60000); } };
+  d.showModal();
 };
 $('#fileImport').onchange = async (e) => {
   const f = e.target.files[0]; if (!f) return;

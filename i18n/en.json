@@ -136,5 +136,11 @@
  "defaults.newPreset": "Preset {n}",
  "th.image": "Image",
  "settings.cells.imageTitle": "Show the source's picture on the button (images only, updated by the refresh sources button)",
- "toast.images": "images: {n}"
+ "toast.images": "images: {n}",
+ "backup.fallback": "If {file} didn't download, copy the text or open it and save via Share → Save to Files.",
+ "backup.copy": "Copy",
+ "backup.open": "Open",
+ "backup.close": "Close",
+ "backup.copied": "Copied",
+ "backup.copyFail": "Couldn't copy — select the text manually"
 }
