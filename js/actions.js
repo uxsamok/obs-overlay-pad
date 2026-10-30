@@ -28,11 +28,12 @@ export class Actions extends EventTarget {
     return idx;
   }
   // Скриншот источника-картинки (PNG, ширина ~320, пропорции по размеру источника)
-  async screenshot(name) {
-    let w = 320, h = 180;
-    try { const { sceneItemTransform: tr } = await this.obs.call('GetSceneItemTransform', this.lookup(name));
-      if (tr.sourceWidth > 0 && tr.sourceHeight > 0) h = Math.max(8, Math.min(4096, Math.round(w * tr.sourceHeight / tr.sourceWidth))); } catch {}
-    const r = await this.obs.call('GetSourceScreenshot', { sourceName: name, imageFormat: 'png', imageWidth: w, imageHeight: h });
+  // dimsFrom: чьи пропорции брать (для временной копии — оригинал). Не прочитались -> полный размер, масштабирует планшет
+  async screenshot(name, dimsFrom = name) {
+    const req = { sourceName: name, imageFormat: 'png' }; const w = 320;
+    try { const { sceneItemTransform: tr } = await this.obs.call('GetSceneItemTransform', this.lookup(dimsFrom));
+      if (tr.sourceWidth > 0 && tr.sourceHeight > 0) { req.imageWidth = w; req.imageHeight = Math.max(8, Math.min(4096, Math.round(w * tr.sourceHeight / tr.sourceWidth))); } } catch {}
+    const r = await this.obs.call('GetSourceScreenshot', req);
     return r.imageData;
   }
   // Кадр из середины видео (ffmpeg_source / vlc_source). Видимость не трогаем:
@@ -92,7 +93,7 @@ export class Actions extends EventTarget {
       await this.obs.call('TriggerMediaInputAction', { inputName: tmp, mediaAction: A + 'PLAY' }); log.played = true;
       // опрос кадра каждые ~120 мс, пока не перестанет быть пустым
       for (const end = Date.now() + maxMs; ;) {
-        try { uri = await this.screenshot(tmp); log.blank = blank ? await blank(uri) : false; } catch (e) { log.err = e.message; }
+        try { uri = await this.screenshot(tmp, name); log.blank = blank ? await blank(uri) : false; } catch (e) { log.err = e.message; }
         if (log.blank === false || Date.now() >= end) break;
         await sleep(120);
       }
