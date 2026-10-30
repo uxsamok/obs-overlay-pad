@@ -470,12 +470,12 @@ async function refreshImages() {
     && IMG_KINDS.has(act.kinds.get(c.source))).map((c) => c.source))];
   const dur = new Map(S.cells.filter((c) => c.source).map((c) => [c.source, +c.duration || 0]));
   let ok = 0; const diag = [];
-  for (const name of names) { try {
+  try { for (const name of names) { try {
     let uri;
     if (VIDEO_KINDS.has(act.kinds.get(name))) { const r = await act.videoFrame(name, dur.get(name), isBlank); uri = r.uri; const L = r.log;
-      diag.push(`${name}: ${L.live ? 'LIVE' : (L.played ? 'PLAY ok' : 'PLAY no')}${L.state ? ' [' + L.state + ']' : ''} · ${L.blank === null ? 'no frame' : L.blank ? 'BLANK' : 'frame ok'}${L.err ? ' · ERR ' + L.err : ''}`); }
+      diag.push(`${name}: ${L.live ? 'LIVE' : (L.copy ? 'copy ok · ' : 'copy NO · ') + (L.played ? 'PLAY ok' : 'PLAY no')}${L.state ? ' [' + L.state + ']' : ''} · ${L.blank === null ? 'no frame' : L.blank ? 'BLANK' : 'frame ok'}${L.err ? ' · ERR ' + L.err : ''}`); }
     else uri = await act.screenshot(name);
-    if (uri && !(await isBlank(uri))) { await putImage(name, uri); ok++; } } catch (e) { diag.push(`${name}: ERR ${e.message}`); } }
+    if (uri && !(await isBlank(uri))) { await putImage(name, uri); ok++; } } catch (e) { diag.push(`${name}: ERR ${e.message}`); } } } finally { await act.thumbEnd(); }
   const vids = S.cells.filter((c) => c.source && VIDEO_KINDS.has(act.kinds.get(c.source)));
   alert('Video frames (diagnostics):\n\n' + (diag.length ? diag.join('\n') : `No video cells with Image on (video cells: ${vids.length}, with Image on: ${vids.filter((c) => c.image).length})`));
   return ok;
