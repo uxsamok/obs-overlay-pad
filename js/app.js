@@ -471,7 +471,7 @@ async function refreshImages() {
   const dur = new Map(S.cells.filter((c) => c.source).map((c) => [c.source, +c.duration || 0]));
   let ok = 0;
   for (const name of names) { try {
-    const uri = VIDEO_KINDS.has(act.kinds.get(name)) ? await act.videoFrame(name, dur.get(name)) : await act.screenshot(name);
+    const uri = VIDEO_KINDS.has(act.kinds.get(name)) ? await act.videoFrame(name, dur.get(name), isBlank) : await act.screenshot(name);
     if (uri && !(await isBlank(uri))) { await putImage(name, uri); ok++; } } catch {} }
   return ok;
 }

@@ -35,25 +35,32 @@ export class Actions extends EventTarget {
     const r = await this.obs.call('GetSourceScreenshot', { sourceName: name, imageFormat: 'png', imageWidth: w, imageHeight: h });
     return r.imageData;
   }
-  // Кадр из середины видео (ffmpeg_source / vlc_source). Безопасно для эфира:
-  // источник в программе (videoActive) не перематываем, видимость/воспроизведение не трогаем,
-  // play не вызываем, позицию возвращаем как было.
-  async videoFrame(name, durSec) {
+  // Кадр из середины видео (ffmpeg_source / vlc_source). Видимость не трогаем:
+  // источник в программе (videoActive) снимаем как есть; иначе PLAY -> ждём PLAYING и длительность ->
+  // перемотка на середину -> скриншот -> STOP всегда (в finally). Позицию не восстанавливаем.
+  async videoFrame(name, durSec, blank) {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-    let act = null; try { act = await this.obs.call('GetSourceActive', { sourceName: name }); } catch {}
-    if (act && act.videoActive) return this.screenshot(name);
-    let st = null; try { st = await this.obs.call('GetMediaInputStatus', { inputName: name }); } catch {}
-    const len = st && st.mediaDuration > 0 ? st.mediaDuration : (durSec > 0 ? durSec * 1000 : 0);
-    const state = st && st.mediaState || '';
-    const canSeek = len > 0 && /PLAYING|PAUSED/.test(state); // stopped/ended/none: медиа может быть закрыто — не трогаем
-    if (!canSeek) return this.screenshot(name);
-    const prev = st.mediaCursor;
+    let live = null; try { live = await this.obs.call('GetSourceActive', { sourceName: name }); } catch {}
+    if (live && live.videoActive) return this.screenshot(name);
+    const vlc = this.kinds && this.kinds.get(name) === 'vlc_source';
+    const openMs = vlc ? 4000 : 1500, settleMs = vlc ? 800 : 300;
+    const A = 'OBS_WEBSOCKET_MEDIA_INPUT_ACTION_';
     try {
-      await this.obs.call('SetMediaInputCursor', { inputName: name, mediaCursor: Math.floor(len / 2) });
-      await sleep(250); // декодер успевает выдать кадр после перемотки
-      return await this.screenshot(name);
+      await this.obs.call('TriggerMediaInputAction', { inputName: name, mediaAction: A + 'PLAY' });
+      let len = 0;
+      for (const end = Date.now() + openMs; Date.now() < end;) {
+        await sleep(100);
+        try { const st = await this.obs.call('GetMediaInputStatus', { inputName: name });
+          if (/PLAYING/.test(st.mediaState || '') && st.mediaDuration > 0) { len = st.mediaDuration; break; } } catch {}
+      }
+      if (!(len > 0) && durSec > 0) len = durSec * 1000;
+      if (len > 0) { try { await this.obs.call('SetMediaInputCursor', { inputName: name, mediaCursor: Math.floor(len / 2) }); } catch {} }
+      await sleep(settleMs);
+      let uri = await this.screenshot(name);
+      if (blank && uri && await blank(uri)) { await sleep(settleMs); uri = await this.screenshot(name); }
+      return uri;
     } finally {
-      if (prev != null) { try { await this.obs.call('SetMediaInputCursor', { inputName: name, mediaCursor: prev }); } catch {} }
+      try { await this.obs.call('TriggerMediaInputAction', { inputName: name, mediaAction: A + 'STOP' }); } catch {}
     }
   }
   lookup(name) {
