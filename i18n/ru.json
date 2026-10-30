@@ -143,5 +143,6 @@
  "backup.close": "Закрыть",
  "backup.copied": "Скопировано",
  "backup.copyFail": "Не удалось скопировать — выделите текст вручную",
- "rescan.progress": "Синхронизация картинок: {n} из {total}"
+ "rescan.progress": "Синхронизация картинок: {n} из {total}",
+ "toast.onlyPreset": "Нельзя удалить единственный пресет"
 }

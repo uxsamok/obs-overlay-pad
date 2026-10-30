@@ -369,7 +369,7 @@ function renderSettings() {
   v.querySelector('#g0').innerHTML =
     box(t('settings.preset.title'), `<div class="gset prow"><select id="presetSel">${S.presets.map((p) => `<option value="${esc(p.id)}"${p.id === S.activePreset ? ' selected' : ''}>${esc(p.name)}</option>`).join('')}</select>
       <button type="button" data-pa="new">${t('settings.preset.new')}</button><button type="button" data-pa="dup">${t('settings.preset.dup')}</button>
-      <button type="button" data-pa="ren">${t('settings.preset.rename')}</button><button type="button" data-pa="del" class="danger"${S.presets.length < 2 ? ' disabled' : ''}>${t('settings.preset.delete')}</button></div>`);
+      <button type="button" data-pa="ren">${t('settings.preset.rename')}</button><button type="button" data-pa="del" class="danger${S.presets.length < 2 ? ' off' : ''}"${S.presets.length < 2 ? ` aria-disabled="true" title="${t('toast.onlyPreset')}"` : ''}>${t('settings.preset.delete')}</button></div>`);
   const sc = [...new Set([...act.sceneOrder, ...S.sceneButtons])]; // сцены OBS + отмеченные, которых сейчас нет
   v.querySelector('#g').innerHTML =
     box(t('settings.scenes.title'), sc.length ? `<div class="chk">${sc.map((n) => { const miss = obs.identified && !act.sceneOrder.includes(n);
@@ -420,6 +420,7 @@ function pick(attr, val, list) {
 $('#v-settings').addEventListener('click', (e) => { // пресеты: новый / копия / переименовать / удалить
   const a = e.target.closest('[data-pa]')?.dataset.pa; if (!a) return; const cur = curPreset(S);
   const ask = (def) => { const v = prompt(t('prompt.presetName'), def); return v == null || !v.trim() ? null : v.trim(); };
+  if (a === 'del' && S.presets.length < 2) { toast(t('toast.onlyPreset')); return; }
   if (a === 'new' || a === 'dup') {
     const name = ask(a === 'dup' ? cur.name + ' 2' : t('defaults.newPreset', { n: S.presets.length + 1 })); if (!name) return;
     const p = a === 'dup' ? normalizePreset({ ...JSON.parse(JSON.stringify(cur)), id: defaultPreset().id, name }) : defaultPreset(name);
