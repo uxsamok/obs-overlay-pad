@@ -123,7 +123,7 @@
  "tc.removeMark": "Remove",
  "defaults.cellLabel": "Overlay {n}",
  "defaults.counterTemplate": "Match {n}",
- "settings.scenes.title": "Scenes",
+ "settings.scenes.title": "Displayed Scenes",
  "settings.scenes.empty": "No scenes: no connection to OBS.",
  "settings.preset.title": "Preset",
  "settings.preset.new": "New",

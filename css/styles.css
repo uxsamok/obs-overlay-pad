@@ -20,7 +20,7 @@ input[type=color]{padding:0;width:48px;height:36px}input[type=number]{width:80px
 th,td{padding:4px;border-bottom:1px solid #263042;text-align:left;font-size:13px}td input:not([type]),td input[data-k=source]{width:100%;min-width:120px}
 .stream{margin:10px;padding:10px;background:#1a202b;border-radius:10px}.stream h3{display:flex;gap:8px;margin:0 0 8px}.stream h3 input{flex:1}
 .mark{display:flex;gap:8px;align-items:center;margin:4px 0}.mark input{flex:1}pre{background:#0c1016;padding:8px;border-radius:6px;white-space:pre-wrap;-webkit-user-select:text;user-select:text}
-#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#2c3546;padding:12px 18px;border-radius:10px;opacity:0;pointer-events:none;transition:opacity .2s}#toast.show{opacity:1}#toast.err{background:#a3262a}
+#toast{position:fixed;left:50%;top:20px;transform:translateX(-50%);background:#2c3546;padding:12px 18px;border-radius:10px;opacity:0;pointer-events:none;transition:opacity .2s}#toast.show{opacity:1}#toast.err{background:#a3262a}
 
 /* шапка: статусы | главные кнопки (крупные) | второстепенные (мелкие, отделены) */
 .mainhdr{gap:10px}.stat{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -79,3 +79,4 @@ dialog.backup{max-width:640px;width:92vw;background:#1e1f24;color:inherit;border
 button.off{opacity:.4;cursor:not-allowed}
 .left .clock{font-size:14px;text-align:center;opacity:.75}
 .left #btnMic{min-height:64px;font-size:17px;margin-top:14px}.left .tc{margin-top:10px}.left .clock{margin-top:6px}
+.left .rgrp{display:flex;flex-direction:column;gap:10px;border-top:1px solid #394355;padding-top:12px;margin-top:8px}.left .rgrp button{min-height:56px;font-weight:600}.left #btnHide{min-height:48px;margin-top:8px}
