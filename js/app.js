@@ -513,20 +513,22 @@ async function refreshImages() {
   const dur = new Map(S.cells.filter((c) => c.source).map((c) => [c.source, +c.duration || 0]));
   let ok = 0; const diag = []; const t0 = Date.now(); let sceneErr = '';
   const line = (name, L) => `${name}: ${L.live ? 'LIVE' : (L.copy ? 'copy ok' + (L.filters ? ' +' + L.filters + ' filters' : '') + ' · ' : 'copy NO · ') + (L.played ? 'PLAY ok' : 'PLAY no') + (L.restarted ? ' +RESTART' : '')}${L.state ? ' [' + L.state + ']' : ''} · ${L.blank === null ? 'no frame' : L.blank ? 'BLANK' : 'frame ok'}${L.err ? ' · ERR ' + L.err : ''} · ${L.ms} ms`;
-  let doneN = 0; const total = names.length;
+  // Звуковые файлы пропускаем молча и не считаем в общем числе картинок
+  const vidNames = [];
+  for (const n of names.filter((x) => VIDEO_KINDS.has(act.kinds.get(x)))) if (!(await isAudio(n))) vidNames.push(n);
+  let doneN = 0; const total = names.filter((n) => !VIDEO_KINDS.has(act.kinds.get(n))).length + vidNames.length;
   const prog = () => { const el = $('#toast'); clearTimeout(toast.h); el.className = 'show'; el.textContent = t('rescan.progress', { n: doneN, total }); };
   if (total) prog();
+  const grab = async (name) => { // один снимок: видео через временную копию, картинка напрямую (+1 попытка при сбое)
+    if (VIDEO_KINDS.has(act.kinds.get(name))) { const r = await act.videoFrame(name, dur.get(name), isBlank); return { uri: r.uri, log: r.log }; }
+    try { return { uri: await act.screenshot(name) }; } catch { await new Promise((r) => setTimeout(r, 300)); return { uri: await act.screenshot(name) }; } };
   const one = async (name) => { try {
-    let uri;
-    if (VIDEO_KINDS.has(act.kinds.get(name))) { const r = await act.videoFrame(name, dur.get(name), isBlank); uri = r.uri; if (r.log.err || r.log.blank !== false) diag.push(line(name, r.log)); }
-    else { // прямой снимок (картинка): одна повторная попытка через 300 мс
-      try { uri = await act.screenshot(name); } catch { await new Promise((r) => setTimeout(r, 300)); uri = await act.screenshot(name); } }
-    if (uri && !(await isBlank(uri))) { await putImage(name, uri); ok++; } else diag.push(`${name}: empty frame (BLANK)`); }
+    let g = await grab(name); let blank = !g.uri || await isBlank(g.uri);
+    if (blank) { await new Promise((r) => setTimeout(r, 300)); g = await grab(name); blank = !g.uri || await isBlank(g.uri); } // пустой кадр — ещё одна попытка
+    if (!blank) { await putImage(name, g.uri); ok++; }
+    else diag.push(g.log ? line(name, g.log) + ' (after retry)' : `${name}: empty frame (BLANK, after retry)`); }
     catch (e) { diag.push(`${name} [${act.kinds.get(name) || '?'}]: direct screenshot failed (after retry) · ${e.message}`); }
     finally { doneN++; prog(); } };
-  const vidNames = [];
-  for (const n of names.filter((x) => VIDEO_KINDS.has(act.kinds.get(x)))) {
-    if (await isAudio(n)) { doneN++; prog(); } else vidNames.push(n); }
   const other = names.filter((n) => !VIDEO_KINDS.has(act.kinds.get(n)));
   try {
     for (const name of other) await one(name);
