@@ -2,10 +2,12 @@ import { ObsClient } from './obs.js';
 import { Actions } from './actions.js';
 import { openColorPicker } from './colorpicker.js';
 import { initI18n, setLang, getLang, languages, t, applyI18n } from './i18n.js';
+import { images, loadImages, putImage } from './imgcache.js';
 import { load, save, normalize, resizeCells, defaultState, defaultPreset, normalizePreset, curPreset } from './store.js';
 
 await initI18n(); // язык — до загрузки состояния (тексты по умолчанию берутся из перевода)
 let S = load();
+await loadImages();
 const obs = new ObsClient();
 const act = new Actions(obs, () => S);
 const $ = (q, r = document) => r.querySelector(q);
@@ -206,7 +208,15 @@ function cellHTML(c, i) {
   else if (st) sub += `<div class="cd">${t('cell.onAir')}</div>`;
   return `<div class="lbl">${esc(c.label)}</div>${sub}${warn ? `<div class="warn">${warn}</div>` : ''}<div class="num">${i + 1}</div>`;
 }
-function updateCell(i) { const el = document.querySelector(`.cell[data-i="${i}"]`); if (!el) return; el.innerHTML = cellHTML(S.cells[i], i); el.classList.toggle('on', active.has(i)); }
+// Картинка кнопки: только если галочка стоит, источник есть в OBS и это image_source
+function cellImg(c) {
+  if (!c.image || c.type === 'counter' || c.type === 'replay' || !c.source) return '';
+  if (obs.identified && act.kinds && act.kinds.get(c.source) !== 'image_source') return '';
+  return images.get(c.source) || '';
+}
+function cellStyle(c) { const img = cellImg(c);
+  return `background:${esc(c.color)}${img ? `;background-image:url('${img}')` : ''}`; }
+function updateCell(i) { const el = document.querySelector(`.cell[data-i="${i}"]`); if (!el) return; el.innerHTML = cellHTML(S.cells[i], i); el.classList.toggle('on', active.has(i)); el.classList.toggle('img', !!cellImg(S.cells[i])); el.setAttribute('style', cellStyle(S.cells[i])); }
 function renderGrid() {
   const g = $('#grid'); const { cols, rows } = S.grid; const per = cols * rows; const pages = Math.ceil(S.cells.length / per);
   g.style.setProperty('--cols', cols); g.style.setProperty('--rows', rows);
@@ -214,7 +224,7 @@ function renderGrid() {
   for (let p = 0; p < pages; p++) {
     h += `<section class="page" data-p="${p}">`;
     for (let i = p * per; i < Math.min(S.cells.length, (p + 1) * per); i++)
-      h += `<div class="cell t-${S.cells[i].type}${active.has(i) ? ' on' : ''}" data-i="${i}" style="background:${esc(S.cells[i].color)}">${cellHTML(S.cells[i], i)}</div>`;
+      h += `<div class="cell t-${S.cells[i].type}${active.has(i) ? ' on' : ''}${cellImg(S.cells[i]) ? ' img' : ''}" data-i="${i}" style="${cellStyle(S.cells[i])}">${cellHTML(S.cells[i], i)}</div>`;
     h += '</section>';
   }
   g.innerHTML = h;
@@ -384,7 +394,8 @@ function renderSettings() {
       return `<input data-k="source" value="${esc(c.source)}" list="${c.type === 'counter' ? 'inpList' : 'srcList'}" placeholder="${t('settings.typeName')}" autocomplete="off"${miss ? ` class="miss" title="${t('settings.missingTitle')}"` : ''}>${miss ? `<div class="warnsm">${t('settings.missing')}</div>` : ''}`; })()}</td>
     <td>${c.type === 'counter' ? `<input data-k="counterTemplate" value="${esc(c.counterTemplate)}" title="${t('settings.cells.templateTitle')}"> № <input data-k="counterValue" type="number" value="${esc(c.counterValue)}">` : sel('mode', modeOpts(), c.mode)}</td>
     <td>${c.type === 'counter' ? '' : `<input data-k="duration" type="number" min="0.5" step="0.5" value="${c.duration}">`}</td>
-    <td><input data-k="timecode" type="checkbox"${c.timecode ? ' checked' : ''}></td></tr>`).join('');
+    <td><input data-k="timecode" type="checkbox"${c.timecode ? ' checked' : ''}></td>
+    <td>${c.type === 'counter' || c.type === 'replay' ? '' : `<input data-k="image" type="checkbox"${c.image ? ' checked' : ''} title="${esc(t('settings.cells.imageTitle'))}">`}</td></tr>`).join('');
 }
 // Выбор источника: обычный <select> со ВСЕМИ вариантами из OBS (у <datalist> Chrome прячет
 // варианты, не содержащие уже введённый текст). Плюс текущее значение и ручной ввод.
@@ -442,7 +453,16 @@ $('#fileImport').onchange = async (e) => {
   e.target.value = '';
 };
 $('#btnReset').onclick = () => { if (confirm(t('confirm.reset'))) { S = defaultState(); applyPreset(); renderSettings(); location.hash = '#settings'; window.scrollTo(0, 0); } };
-$('#btnRescan').onclick = () => act.rebuildIndex().then(() => { renderSettings(); toast(t('toast.rescan', { n: act.index.size })); }).catch((e) => toast(e.message, true));
+// Скриншоты картинок для кнопок: по одному, ошибка одного источника не мешает остальным
+async function refreshImages() {
+  const names = [...new Set(S.cells.filter((c) => c.image && c.source && c.type !== 'counter' && c.type !== 'replay'
+    && act.kinds.get(c.source) === 'image_source').map((c) => c.source))];
+  let ok = 0;
+  for (const name of names) { try { const uri = await act.screenshot(name); if (uri) { await putImage(name, uri); ok++; } } catch {} }
+  return ok;
+}
+$('#btnRescan').onclick = () => act.rebuildIndex().then(async () => { renderSettings(); const n = await refreshImages(); renderGrid();
+  toast(t('toast.rescan', { n: act.index.size }) + (n ? ' · ' + t('toast.images', { n }) : '')); }).catch((e) => toast(e.message, true));
 
 function renderTimecodes() {
   const v = $('#tc');

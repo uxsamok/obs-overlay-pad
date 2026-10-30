@@ -133,5 +133,8 @@
  "prompt.presetName": "Название пресета:",
  "confirm.deletePreset": "Удалить пресет «{name}»?",
  "defaults.presetName": "Default",
- "defaults.newPreset": "Пресет {n}"
+ "defaults.newPreset": "Пресет {n}",
+ "th.image": "Картинка",
+ "settings.cells.imageTitle": "Показывать картинку источника на кнопке (только изображения, обновляется кнопкой обновления источников)",
+ "toast.images": "картинок: {n}"
 }

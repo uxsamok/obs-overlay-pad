@@ -2,7 +2,7 @@ import { t } from './i18n.js';
 const KEY = 'obs-overlay-pad-v1'; // ключ хранилища, НЕ версия приложения (не менять — потеряются настройки)
 export function defaultCell(i) {
   return { label: t('defaults.cellLabel', { n: i + 1 }), color: '#2b3a55', type: 'overlay', source: '', mode: 'timer', duration: 8,
-    timecode: false, startGameTimer: false, counterTemplate: t('defaults.counterTemplate'), counterValue: 1 };
+    timecode: false, image: true, startGameTimer: false, counterTemplate: t('defaults.counterTemplate'), counterValue: 1 };
 }
 // Пресеты (v3): поля из PKEYS живут в каждом пресете, остальное — общее.
 // Код читает S.cells / S.grid / ... как раньше: это геттеры/сеттеры на активный пресет (в JSON не попадают).

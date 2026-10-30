@@ -68,3 +68,5 @@ input.miss{border-color:#d9a400}.warnsm{font-size:11px;color:#ffd36b}
 #scenes button.cur{background:#3b82f6;border-color:#9cc2ff}#scenes button.miss{opacity:.5;border-style:dashed;border-color:#d9a400}
 .chk label.missl{opacity:.6;color:#ffd36b}
 .prow{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.prow select{min-width:200px}.preset{font-size:12px;opacity:.7;margin-left:6px}
+.cell.img{background-size:cover!important;background-position:center!important;background-repeat:no-repeat!important;border-color:var(--frame,transparent)}
+.cell.img .lbl{background:#000a;padding:2px 8px;border-radius:6px}.cell.img .cd,.cell.img .warn{background:#000a;padding:0 6px;border-radius:6px}

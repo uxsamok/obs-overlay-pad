@@ -133,5 +133,8 @@
  "prompt.presetName": "Preset name:",
  "confirm.deletePreset": "Delete preset «{name}»?",
  "defaults.presetName": "Default",
- "defaults.newPreset": "Preset {n}"
+ "defaults.newPreset": "Preset {n}",
+ "th.image": "Image",
+ "settings.cells.imageTitle": "Show the source's picture on the button (images only, updated by the refresh sources button)",
+ "toast.images": "images: {n}"
 }

@@ -22,9 +22,18 @@ export class Actions extends EventTarget {
     this.sceneOrder = scenes.map((x) => x.sceneName).reverse();
     this.scenes = scenes.map((x) => x.sceneName).sort((a, b) => a.localeCompare(b));
     const { inputs } = await this.obs.call('GetInputList');
+    this.kinds = new Map(inputs.map((x) => [x.inputName, x.unversionedInputKind || x.inputKind || '']));
     this.inputs = inputs.map((x) => x.inputName).sort((a, b) => a.localeCompare(b));
     this.dispatchEvent(new Event('index'));
     return idx;
+  }
+  // Скриншот источника-картинки (PNG, ширина ~320, пропорции по размеру источника)
+  async screenshot(name) {
+    let w = 320, h = 180;
+    try { const { sceneItemTransform: tr } = await this.obs.call('GetSceneItemTransform', this.lookup(name));
+      if (tr.sourceWidth > 0 && tr.sourceHeight > 0) h = Math.max(8, Math.min(4096, Math.round(w * tr.sourceHeight / tr.sourceWidth))); } catch {}
+    const r = await this.obs.call('GetSourceScreenshot', { sourceName: name, imageFormat: 'png', imageWidth: w, imageHeight: h });
+    return r.imageData;
   }
   lookup(name) {
     const refs = this.index.get(name) || [];
