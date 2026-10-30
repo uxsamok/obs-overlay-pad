@@ -372,9 +372,6 @@ function renderSettings() {
   if (document.activeElement?.classList.contains('pick')) { clearTimeout(renderSettings.t2); renderSettings.t2 = setTimeout(renderSettings, 800); return; }
   const v = $('#v-settings');
   const items = [...act.index.keys()].sort((a, b) => a.localeCompare(b)); // всё, что стоит в сценах
-  // Ячейки: <input list> — набор текста фильтрует варианты (удобно при многих источниках)
-  const dl = (l) => l.map((n) => `<option value="${esc(n)}">`).join('');
-  $('#srcList').innerHTML = dl(items); $('#inpList').innerHTML = dl(act.inputs); $('#sceneList').innerHTML = dl(act.scenes);
   if (obs.identified && !renderSettings.mic) act.audioInputs().then((l) => { renderSettings.mic = l; renderSettings(); }).catch(() => {});
   v.querySelector('#g0').innerHTML =
     box(t('settings.preset.title'), `<div class="gset prow"><select id="presetSel">${S.presets.map((p) => `<option value="${esc(p.id)}"${p.id === S.activePreset ? ' selected' : ''}>${esc(p.name)}</option>`).join('')}</select>
@@ -393,8 +390,7 @@ function renderSettings() {
       <label>${t('settings.grid.cols')} <input data-g="grid.cols" type="number" min="1" max="12" value="${S.grid.cols}"></label>
       <label>${t('settings.grid.rows')} <input data-g="grid.rows" type="number" min="1" max="12" value="${S.grid.rows}"></label>
       <label>${t('settings.grid.total')} <input data-g="grid.total" type="number" min="1" max="500" value="${S.grid.total}"></label></div>`) +
-    box(t('settings.hideAll.title'), `<div class="gset"><label>${t('settings.hideAll.scene')} ${(() => { const miss = S.overlaysScene && obs.identified && !act.scenes.includes(S.overlaysScene);
-        return `<input data-g="overlaysScene" value="${esc(S.overlaysScene)}" list="sceneList" placeholder="${t('settings.typeName')}" autocomplete="off"${miss ? ` class="miss" title="${t('settings.missingTitle')}"` : ''}>${miss ? `<div class="warnsm">${t('settings.missing')}</div>` : ''}`; })()}</label></div>
+    box(t('settings.hideAll.title'), `<div class="gset"><label>${t('settings.hideAll.scene')} ${pick('data-g="overlaysScene"', S.overlaysScene, act.scenes)}</label></div>
       <p class="hint">${t('settings.hideAll.hint')}</p>`) +
     box(t('settings.replay.title'), `<p class="hint">${t('settings.replay.hint')} <details><summary>${t('settings.replay.more')}</summary>${t('settings.replay.details')}</details></p>
       <div class="gset"><label>${t('settings.replay.source')} ${pick('data-g="replay.mediaSource"', S.replay.mediaSource, act.inputs)}</label></div>`) +
@@ -411,8 +407,7 @@ function renderSettings() {
     <td><button type="button" class="swbtn" data-color="${i}" style="background:${esc(c.color)}" aria-label="${esc(t('settings.cells.color', { c: c.color }))}"></button></td>
     <td>${sel('type', typeOpts(), c.type)}</td>
     <td>${c.type === 'replay' ? `<span class="hint">${t('settings.cells.fromReplay')}</span>` : (() => { const l = c.type === 'counter' ? act.inputs : items;
-      const miss = c.source && obs.identified && !l.includes(c.source);
-      return `<input data-k="source" value="${esc(c.source)}" list="${c.type === 'counter' ? 'inpList' : 'srcList'}" placeholder="${t('settings.typeName')}" autocomplete="off"${miss ? ` class="miss" title="${t('settings.missingTitle')}"` : ''}>${miss ? `<div class="warnsm">${t('settings.missing')}</div>` : ''}`; })()}</td>
+      return pick('data-k="source"', c.source, l); })()}</td>
     <td>${c.type === 'counter' ? `<input data-k="counterTemplate" value="${esc(c.counterTemplate)}" title="${t('settings.cells.templateTitle')}"> № <input data-k="counterValue" type="number" value="${esc(c.counterValue)}">` : sel('mode', modeOpts(), c.mode)}</td>
     <td>${c.type === 'counter' ? '' : `<input data-k="duration" type="number" min="0.5" step="0.5" value="${c.duration}">`}</td>
     <td><input data-k="timecode" type="checkbox"${c.timecode ? ' checked' : ''}></td>
