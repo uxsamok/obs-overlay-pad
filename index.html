@@ -8,7 +8,7 @@
   <header class="mainhdr">
     <div class="stat">
       <span id="conn" class="conn">OBS …</span>
-      <span id="live" class="live"></span><span id="rec" class="rec">○ REC</span><span id="buf" class="buf" role="button"></span><span id="elapsed"></span>
+      <span id="live" class="live"></span><span id="rec" class="rec">○ REC</span><span id="buf" class="buf" role="button"></span><span id="health" class="health" role="button" title=""><i></i></span><span id="elapsed"></span>
       <span id="preset" class="preset"></span><span id="gtimer" class="gtimer"></span>
     </div>
     <span class="sp"></span>
@@ -46,4 +46,5 @@
 </div>
 <div id="toast"></div>
 <script type="module" src="js/app.js"></script>
+<dialog id="healthDlg" class="backup"><h3 data-i18n="health.title"></h3><pre id="healthTxt"></pre><div class="row"><button id="healthClose" data-i18n="health.close"></button></div></dialog>
 </body></html>

@@ -141,5 +141,20 @@
   "backup.copied": "Copied",
   "backup.copyFail": "Couldn't copy — select the text manually",
   "rescan.progress": "Syncing images: {n} of {total}",
-  "toast.onlyPreset": "Cannot delete the only preset"
+  "toast.onlyPreset": "Cannot delete the only preset",
+  "health.title": "Stream health",
+  "health.close": "Close",
+  "health.noData": "No data from OBS yet.",
+  "health.stream": "Stream",
+  "health.on": "live",
+  "health.off": "off",
+  "health.reconnecting": "reconnecting",
+  "health.congestion": "Network congestion",
+  "health.netDrop": "Dropped frames (network)",
+  "health.encDrop": "Skipped frames (encoder)",
+  "health.rndDrop": "Skipped frames (render)",
+  "health.hintNet": "Network: lower the bitrate in OBS or free up the connection (stop downloads, use cable).",
+  "health.hintEnc": "Encoder overloaded: use a hardware encoder or a faster preset, or lower the resolution.",
+  "health.hintRender": "Rendering lags: close heavy apps, reduce sources/filters, or lower FPS.",
+  "health.allOk": "All fine, nothing to do."
 }

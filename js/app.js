@@ -146,6 +146,50 @@ function renderScenes() {
 }
 async function poll() { if (!obs.identified) return; try { live = { ...(await act.status()), at: Date.now() }; } catch {} }
 setInterval(poll, 5000);
+// Здоровье стрима: полоска растёт с проблемами (зелёная → жёлтая → красная), по нажатию — подробности.
+// Тихо, когда всё хорошо; сигнал при риске; полный отчёт по запросу. Кадры считаем приростом за опрос.
+let health = { score: 0, prev: null, data: null, fps: null };
+async function pollHealth() {
+  if (!obs.identified) return renderHealth();
+  try {
+    if (!health.fps) { const v = await obs.call('GetVideoSettings'); health.fps = v.fpsNumerator / v.fpsDenominator; }
+    const [ss, st] = await Promise.all([obs.call('GetStreamStatus'), obs.call('GetStats')]);
+    const p = health.prev; const d = (k, o) => p ? Math.max(0, o[k] - p[o === ss ? 's' : 'g'][k]) : 0;
+    const netDrop = d('outputTotalFrames', ss) ? d('outputSkippedFrames', ss) / d('outputTotalFrames', ss) : 0;
+    const encDrop = d('outputTotalFrames', st) ? d('outputSkippedFrames', st) / d('outputTotalFrames', st) : 0;
+    const rndDrop = d('renderTotalFrames', st) ? d('renderSkippedFrames', st) / d('renderTotalFrames', st) : 0;
+    const fpsDef = health.fps ? Math.max(0, 1 - st.activeFps / health.fps) : 0;
+    const cong = ss.outputActive ? (ss.outputCongestion || 0) : 0;
+    // 5% потерь или 20% недобора FPS — уже полная красная
+    health.score = Math.min(1, Math.max(cong, (ss.outputActive ? netDrop : 0) * 20, encDrop * 20, rndDrop * 20, fpsDef * 5, ss.outputReconnecting ? 1 : 0));
+    health.prev = { s: ss, g: st }; health.data = { ss, st, netDrop, encDrop, rndDrop, cong };
+  } catch { health.data = null; }
+  renderHealth();
+}
+function renderHealth() {
+  const el = $('#health'); if (!el) return; const s = obs.identified && health.data ? health.score : null;
+  el.className = 'health' + (s == null ? ' na' : s >= 0.5 ? ' bad' : s >= 0.1 ? ' warn' : ' ok');
+  el.firstChild.style.width = (s == null ? 15 : 15 + 85 * s) + '%';
+  el.title = t('health.title');
+}
+function healthReport() {
+  const h = health.data; if (!h) return t('health.noData');
+  const pc = (x) => (x * 100).toFixed(1) + '%'; const { ss, st } = h; const L = [];
+  L.push(t('health.stream') + ': ' + (ss.outputActive ? (ss.outputReconnecting ? t('health.reconnecting') : t('health.on')) : t('health.off')));
+  if (ss.outputActive) { L.push(t('health.congestion') + ': ' + pc(h.cong)); L.push(t('health.netDrop') + ': ' + pc(h.netDrop) + ` (${ss.outputSkippedFrames} / ${ss.outputTotalFrames})`); }
+  L.push(t('health.encDrop') + ': ' + pc(h.encDrop) + ` (${st.outputSkippedFrames} / ${st.outputTotalFrames})`);
+  L.push(t('health.rndDrop') + ': ' + pc(h.rndDrop) + ` (${st.renderSkippedFrames} / ${st.renderTotalFrames})`);
+  L.push(`FPS: ${st.activeFps.toFixed(1)}${health.fps ? ' / ' + Math.round(health.fps) : ''} · CPU: ${st.cpuUsage.toFixed(0)}%`);
+  const hints = [];
+  if (ss.outputReconnecting || h.cong >= 0.1 || h.netDrop >= 0.005) hints.push(t('health.hintNet'));
+  if (h.encDrop >= 0.005) hints.push(t('health.hintEnc'));
+  if (h.rndDrop >= 0.005 || (health.fps && st.activeFps < health.fps * 0.95)) hints.push(t('health.hintRender'));
+  L.push('', hints.length ? hints.join('\n') : t('health.allOk'));
+  return L.join('\n');
+}
+$('#health').onclick = () => { $('#healthTxt').textContent = healthReport(); $('#healthDlg').showModal(); };
+$('#healthClose').onclick = () => $('#healthDlg').close();
+setInterval(pollHealth, 5000);
 function connect() { obs.connect(S.obs.host, S.obs.port, S.obs.password); }
 
 // ---------- Таймкоды ----------
