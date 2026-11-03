@@ -88,3 +88,8 @@ button.off{opacity:.4;cursor:not-allowed}
 #health i{display:block;height:6px;border-radius:3px;background:#666;transition:width .4s,background .4s}
 #health.ok i{background:#2e9d4f}#health.warn i{background:#d9a400}#health.bad i{background:#d33}
 #healthTxt{white-space:pre-wrap;font:14px/1.5 ui-monospace,monospace;margin:8px 0}
+
+.pwdw { display: flex; gap: 6px; align-items: stretch; }
+.pwdw input { flex: 1; min-width: 0; }
+.pwdeye { min-width: 44px; min-height: 44px; font-size: 18px; opacity: .55; }
+.pwdeye.on { opacity: 1; }

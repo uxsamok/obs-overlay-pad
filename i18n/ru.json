@@ -62,6 +62,8 @@
   "settings.obs.host": "Адрес",
   "settings.obs.port": "Порт",
   "settings.obs.password": "Пароль",
+  "settings.obs.showPwd": "Показать пароль",
+  "settings.obs.hidePwd": "Скрыть пароль",
   "settings.grid.title": "Сетка",
   "settings.grid.cols": "Колонки",
   "settings.grid.rows": "Строки на экране",

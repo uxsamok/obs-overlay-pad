@@ -62,6 +62,8 @@
   "settings.obs.host": "Address",
   "settings.obs.port": "Port",
   "settings.obs.password": "Password",
+  "settings.obs.showPwd": "Show password",
+  "settings.obs.hidePwd": "Hide password",
   "settings.grid.title": "Grid",
   "settings.grid.cols": "Columns",
   "settings.grid.rows": "Rows on screen",

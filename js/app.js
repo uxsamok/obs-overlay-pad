@@ -429,7 +429,7 @@ function renderSettings() {
     box(t('settings.obs.title'), `<div class="gset">
       <label>${t('settings.obs.host')} <input data-g="obs.host" value="${esc(S.obs.host)}"></label>
       <label>${t('settings.obs.port')} <input data-g="obs.port" type="number" value="${S.obs.port}"></label>
-      <label>${t('settings.obs.password')} <input data-g="obs.password" type="password" value="${esc(S.obs.password)}"></label></div>`) +
+      <label>${t('settings.obs.password')} <span class="pwdw"><input data-g="obs.password" type="password" autocomplete="off" value="${esc(S.obs.password)}"><button type="button" class="pwdeye" data-pwdeye aria-label="${t('settings.obs.showPwd')}" title="${t('settings.obs.showPwd')}">👁</button></span></label></div>`) +
     box(t('settings.grid.title'), `<div class="gset">
       <label>${t('settings.grid.cols')} <input data-g="grid.cols" type="number" min="1" max="12" value="${S.grid.cols}"></label>
       <label>${t('settings.grid.rows')} <input data-g="grid.rows" type="number" min="1" max="12" value="${S.grid.rows}"></label>
@@ -619,3 +619,11 @@ connect(); // сначала соединение: ошибка отрисовк
 try { renderMatch(); renderPresetName(); route(); } catch (e) { console.error(e); toast(e.message, true); }
 // версия — из файла VERSION (единственный источник)
 fetch('VERSION').then((r) => r.ok ? r.text() : '').then((v) => { $('#ver').textContent = v.trim() ? 'v' + v.trim() : ''; }).catch(() => {});
+
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-pwdeye]'); if (!b) return;
+  e.preventDefault();
+  const inp = b.parentElement.querySelector('input'); const show = inp.type === 'password';
+  inp.type = show ? 'text' : 'password'; b.classList.toggle('on', show);
+  const l = t(show ? 'settings.obs.hidePwd' : 'settings.obs.showPwd'); b.setAttribute('aria-label', l); b.title = l;
+});
