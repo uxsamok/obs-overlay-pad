@@ -2,12 +2,16 @@ import { ObsClient } from './obs.js';
 import { Actions } from './actions.js';
 import { openColorPicker } from './colorpicker.js';
 import { initI18n, setLang, getLang, languages, t, applyI18n } from './i18n.js';
-import { images, loadImages, putImage } from './imgcache.js';
+import { images, loadImages, putImage, deleteImage, imgKey } from './imgcache.js';
 import { load, save, normalize, resizeCells, defaultState, defaultPreset, normalizePreset, curPreset } from './store.js';
 
 await initI18n(); // язык — до загрузки состояния (тексты по умолчанию берутся из перевода)
 let S = load();
 await loadImages();
+// до 1.19 ключом было только имя источника -> раздаём старые снимки всем пресетам
+for (const [k, v] of [...images]) if (!k.includes('|')) { for (const p of S.presets) if (!images.has(imgKey(p.id, k))) await putImage(imgKey(p.id, k), v); await deleteImage(k); }
+const img = (name) => images.get(imgKey(S.activePreset, name));
+let connKey = '';
 const obs = new ObsClient();
 const act = new Actions(obs, () => S);
 const $ = (q, r = document) => r.querySelector(q);
@@ -131,6 +135,7 @@ obs.addEventListener('SceneItemEnableStateChanged', (e) => {
 function clearActive() { for (const st of active.values()) clearTimeout(st.timer); active.clear(); }
 function renderPresetName() { $('#preset').textContent = S.presets.length > 1 ? curPreset(S).name : ''; }
 function applyPreset() {
+  if (JSON.stringify(S.obs) !== connKey) connect(); // у пресета своё подключение
   clearActive(); replayOn = false; setPlayBtn(); refreshReplayBtn(); persist();
   renderMatch(); renderPresetName(); refreshMic(); pushMatch(); renderGrid(); syncActive();
   if (location.hash === '#settings') renderSettings();
@@ -190,7 +195,7 @@ function healthReport() {
 $('#health').onclick = () => { $('#healthTxt').textContent = healthReport(); $('#healthDlg').showModal(); };
 $('#healthClose').onclick = () => $('#healthDlg').close();
 setInterval(pollHealth, 5000);
-function connect() { obs.connect(S.obs.host, S.obs.port, S.obs.password); }
+function connect() { connKey = JSON.stringify(S.obs); obs.connect(S.obs.host, S.obs.port, S.obs.password); }
 
 // ---------- Таймкоды ----------
 // Отсчёт — от старта трансляции в OBS (outputDuration из GetStreamStatus): 00:00 записи на YouTube
@@ -276,7 +281,7 @@ async function detectAudio() { for (const n of new Set(S.cells.filter((c) => c.s
 function cellImg(c) {
   if (!c.image || c.type === 'counter' || c.type === 'replay' || !c.source) return '';
   if (obs.identified && act.kinds && !IMG_KINDS.has(act.kinds.get(c.source))) return '';
-  return images.get(c.source) || '';
+  return img(c.source) || '';
 }
 function cellStyle(c) { const img = cellImg(c);
   return `background:${esc(c.color)}${img ? `;background-image:url('${img}')` : ''}`; }
@@ -482,9 +487,11 @@ $('#v-settings').addEventListener('click', (e) => { // пресеты: новы�
   if (a === 'new' || a === 'dup') {
     const name = ask(a === 'dup' ? cur.name + ' 2' : t('defaults.newPreset', { n: S.presets.length + 1 })); if (!name) return;
     const p = a === 'dup' ? normalizePreset({ ...JSON.parse(JSON.stringify(cur)), id: defaultPreset().id, name }) : defaultPreset(name);
+    if (a === 'dup') for (const [k, v] of [...images]) if (k.startsWith(cur.id + '|')) putImage(imgKey(p.id, k.slice(cur.id.length + 1)), v);
     S.presets.push(p); S.activePreset = p.id; applyPreset();
   } else if (a === 'ren') { const name = ask(cur.name); if (!name) return; cur.name = name; persist(); renderPresetName(); renderSettings(); }
   else if (a === 'del' && S.presets.length > 1 && confirm(t('confirm.deletePreset', { name: cur.name }))) {
+    for (const k of [...images.keys()]) if (k.startsWith(cur.id + '|')) deleteImage(k);
     S.presets = S.presets.filter((p) => p !== cur); S.activePreset = S.presets[0].id; applyPreset();
   }
 });
@@ -514,7 +521,9 @@ $('#v-settings').addEventListener('change', (e) => {
   persist(); if (['type', 'label', 'duration', 'source'].includes(el.dataset.k) || el.dataset.g) renderSettings();
 });
 $('#btnExport').onclick = () => {
-  const json = JSON.stringify(S, null, 2); const fname = `obs-overlay-pad-${new Date().toISOString().slice(0, 10)}.json`;
+  const out = JSON.parse(JSON.stringify(S)); // миниатюры (base64) — внутрь каждого пресета, файл самодостаточный
+  for (const p of out.presets) { const m = {}; for (const [k, v] of images) if (k.startsWith(p.id + '|')) m[k.slice(p.id.length + 1)] = v; p.images = m; }
+  const json = JSON.stringify(out, null, 2); const fname = `obs-overlay-pad-${new Date().toISOString().slice(0, 10)}.json`;
   const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
   const a = document.createElement('a'); a.href = url; a.download = fname; a.style.display = 'none';
   document.body.appendChild(a); a.click(); setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 60000);
@@ -532,7 +541,11 @@ $('#btnExport').onclick = () => {
 };
 $('#fileImport').onchange = async (e) => {
   const f = e.target.files[0]; if (!f) return;
-  try { S = normalize(JSON.parse(await f.text())); persist(); connect(); applyPreset(); renderSettings(); toast(t('toast.importOk')); } catch (err) { toast(t('toast.importErr', { msg: err.message }), true); }
+  try { const raw = JSON.parse(await f.text());
+    const imgs = (raw.presets || []).map((p) => [String(p.id), p && p.images && typeof p.images === 'object' ? p.images : {}]);
+    S = normalize(raw);
+    for (const [id, m] of imgs) for (const [n, v] of Object.entries(m)) if (typeof v === 'string' && v.startsWith('data:image/')) await putImage(imgKey(id, n), v);
+    persist(); connect(); applyPreset(); renderSettings(); toast(t('toast.importOk')); } catch (err) { toast(t('toast.importErr', { msg: err.message }), true); }
   e.target.value = '';
 };
 $('#btnReset').onclick = () => { if (confirm(t('confirm.reset'))) { S = defaultState(); applyPreset(); renderSettings(); location.hash = '#settings'; window.scrollTo(0, 0); } };
@@ -564,7 +577,7 @@ async function refreshImages() {
   const one = async (name) => { try {
     let g = await grab(name); let blank = !g.uri || await isBlank(g.uri);
     if (blank) { await new Promise((r) => setTimeout(r, 300)); g = await grab(name); blank = !g.uri || await isBlank(g.uri); } // пустой кадр — ещё одна попытка
-    if (!blank) { await putImage(name, g.uri); ok++; }
+    if (!blank) { await putImage(imgKey(S.activePreset, name), g.uri); ok++; }
     else diag.push(g.log ? line(name, g.log) + ' (after retry)' : `${name}: empty frame (BLANK, after retry)`); }
     catch (e) { diag.push(`${name} [${act.kinds.get(name) || '?'}]: direct screenshot failed (after retry) · ${e.message}`); }
     finally { doneN++; prog(); } };

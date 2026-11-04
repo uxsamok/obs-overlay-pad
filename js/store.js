@@ -6,7 +6,8 @@ export function defaultCell(i) {
 }
 // Пресеты (v3): поля из PKEYS живут в каждом пресете, остальное — общее.
 // Код читает S.cells / S.grid / ... как раньше: это геттеры/сеттеры на активный пресет (в JSON не попадают).
-export const PKEYS = ['cells', 'grid', 'overlaysScene', 'gameTimer', 'match', 'sceneButtons', 'mic'];
+export const PKEYS = ['cells', 'grid', 'overlaysScene', 'gameTimer', 'match', 'sceneButtons', 'mic', 'obs', 'replay'];
+const defObs = () => ({ host: location.hostname || '192.168.1.50', port: 4455, password: '' });
 export function defaultPreset(name, id) {
   return {
     id: id || 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: name || t('defaults.presetName'),
@@ -16,6 +17,8 @@ export function defaultPreset(name, id) {
     match: { source: '', template: t('defaults.counterTemplate'), value: 1 }, // номер матча (− N + в шапке)
     sceneButtons: [], // имена сцен OBS, показанных кнопками слева на главном экране
     mic: { source: '' }, // аудиовход OBS для кнопки «Мик»
+    obs: defObs(), // подключение: у каждого пресета своё (пресет = машина/сеть)
+    replay: { mediaSource: '' },
     cells: Array.from({ length: 12 }, (_, i) => defaultCell(i)),
   };
 }
@@ -23,17 +26,15 @@ export function defaultState() {
   const p = defaultPreset();
   return attach({
     version: 3,
-    obs: { host: location.hostname || '192.168.1.50', port: 4455, password: '' },
-    replay: { mediaSource: '' },
     streams: [], // {id, title, startedAt, marks:[{t, label}]}
     presets: [p], activePreset: p.id,
   });
 }
 export function normalizePreset(p) {
   const d = defaultPreset(p && p.name, p && p.id); p = Object.assign(d, p || {});
-  for (const k of ['grid', 'gameTimer', 'match', 'mic']) p[k] = Object.assign(defaultPreset()[k], p[k]);
+  for (const k of ['grid', 'gameTimer', 'match', 'mic', 'obs', 'replay']) p[k] = Object.assign(defaultPreset()[k], p[k]);
   p.match.value = +p.match.value || 0; if (!Array.isArray(p.sceneButtons)) p.sceneButtons = [];
-  p.name = String(p.name || '').trim() || t('defaults.presetName'); p.id = String(p.id);
+  delete p.images; p.name = String(p.name || '').trim() || t('defaults.presetName'); p.id = String(p.id);
   resizeCells(p);
   return p;
 }
@@ -45,7 +46,9 @@ export function normalize(s) {
     const p = { name: t('defaults.presetName') }; for (const k of PKEYS) if (k in s) p[k] = s[k];
     presets = [p];
   }
-  const out = { version: 3, obs: Object.assign(d.obs, s.obs), replay: Object.assign(d.replay, s.replay),
+  // до 1.19: obs и replay были общими -> копируем в пресеты, где их ещё нет
+  for (const k of ['obs', 'replay']) if (s[k]) presets.forEach((p) => { if (!p[k]) p[k] = JSON.parse(JSON.stringify(s[k])); });
+  const out = { version: 3,
     streams: Array.isArray(s.streams) ? s.streams : [], presets: presets.map(normalizePreset) };
   const ids = new Set(); out.presets.forEach((p) => { if (ids.has(p.id)) p.id = defaultPreset().id; ids.add(p.id); });
   out.activePreset = ids.has(String(s.activePreset)) ? String(s.activePreset) : out.presets[0].id;

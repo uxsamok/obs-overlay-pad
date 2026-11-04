@@ -1,7 +1,8 @@
-// Кэш картинок кнопок (скриншоты источников) — отдельно от настроек: IndexedDB, ключ = имя источника.
+// Кэш картинок кнопок (скриншоты источников) — отдельно от настроек: IndexedDB, ключ = id пресета + '|' + имя источника (imgKey).
 // В экспорт настроек не попадает. В памяти — Map для синхронного рендера.
 const DB = 'obs-overlay-pad-images', ST = 'img';
 export const images = new Map();
+export const imgKey = (presetId, name) => presetId + '|' + name;
 function open() {
   return new Promise((res, rej) => { const r = indexedDB.open(DB, 1);
     r.onupgradeneeded = () => r.result.createObjectStore(ST); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
