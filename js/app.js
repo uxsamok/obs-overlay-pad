@@ -101,9 +101,32 @@ document.querySelectorAll('#match [data-md]').forEach((b) => b.onclick = () => {
 });
 // Микрофон
 let micMuted = null; // true / false / null (не настроен или нет связи)
-function setMic(m) { micMuted = m; const b = $('#btnMic'); b.classList.toggle('alert', m === true); b.classList.toggle('dim', m == null); b.classList.toggle('micon', m === false); b.textContent = t(m === true ? 'hdr.micMuted' : 'hdr.mic'); }
-async function refreshMic() { if (!obs.identified || !S.mic.source) return setMic(null); try { setMic(await act.getMute(S.mic.source)); } catch { setMic(null); } }
-obs.addEventListener('InputMuteStateChanged', (e) => { if (e.detail.inputName === S.mic.source) setMic(e.detail.inputMuted); });
+let micRevision = 0, micBusy = false;
+function setMic(m) {
+  micRevision++;
+  micMuted = typeof m === 'boolean' ? m : null;
+  const b = $('#btnMic');
+  b.classList.toggle('alert', micMuted === true);
+  b.classList.toggle('dim', micMuted == null);
+  b.classList.toggle('micon', micMuted === false);
+  $('.left').classList.toggle('mic-muted', micMuted === true);
+  b.textContent = t(micMuted === true ? 'hdr.micMuted' : 'hdr.mic');
+}
+// Ignore replies from an old preset/connection, or superseded by a newer OBS event.
+function micReplyGuard() {
+  const revision = micRevision, source = S.mic.source, preset = S.activePreset, socket = obs.ws;
+  return () => obs.identified && obs.ws === socket && S.activePreset === preset && S.mic.source === source && micRevision === revision;
+}
+async function refreshMic(clear = true) {
+  if (clear || !obs.identified || !S.mic.source) setMic(null);
+  if (!obs.identified || !S.mic.source) return;
+  const current = micReplyGuard();
+  try { const muted = await act.getMute(S.mic.source); if (current()) setMic(muted); }
+  catch { if (current()) setMic(null); }
+}
+obs.addEventListener('InputMuteStateChanged', (e) => {
+  if (obs.identified && S.mic.source && e.detail.inputName === S.mic.source) setMic(e.detail.inputMuted);
+});
 // Оверлеи, видимые в OBS -> подсветка ячеек. Источник ячейки = первая запись индекса (как в act.show/hide).
 const cellRef = (c) => c.type === 'overlay' && c.source ? (act.index.get(c.source) || [])[0] : null;
 // При подключении / смене пресета: включённые в OBS — «в эфире» (без отсчёта: сколько осталось, неизвестно).
@@ -135,6 +158,7 @@ obs.addEventListener('SceneItemEnableStateChanged', (e) => {
 function clearActive() { for (const st of active.values()) clearTimeout(st.timer); active.clear(); }
 function renderPresetName() { $('#preset').textContent = S.presets.length > 1 ? curPreset(S).name : ''; }
 function applyPreset() {
+  setMic(null);
   if (JSON.stringify(S.obs) !== connKey) connect(); // у пресета своё подключение
   clearActive(); replayOn = false; setPlayBtn(); refreshReplayBtn(); persist();
   renderMatch(); renderPresetName(); refreshMic(); pushMatch(); renderGrid(); syncActive();
@@ -195,7 +219,7 @@ function healthReport() {
 $('#health').onclick = () => { $('#healthTxt').textContent = healthReport(); $('#healthDlg').showModal(); };
 $('#healthClose').onclick = () => $('#healthDlg').close();
 setInterval(pollHealth, 5000);
-function connect() { connKey = JSON.stringify(S.obs); obs.connect(S.obs.host, S.obs.port, S.obs.password); }
+function connect() { setMic(null); connKey = JSON.stringify(S.obs); obs.connect(S.obs.host, S.obs.port, S.obs.password); }
 
 // ---------- Таймкоды ----------
 // Отсчёт — от старта трансляции в OBS (outputDuration из GetStreamStatus): 00:00 записи на YouTube
@@ -390,7 +414,12 @@ $('#btnPlay').onclick = async () => {
 $('#btnMic').onclick = async () => {
   if (!S.mic.source) return toast(t('toast.micNoSource'), true);
   if (!obs.identified) return toast(t('err.noObs'), true);
-  try { setMic(await act.toggleMute(S.mic.source)); } catch (err) { toast(err.message, true); }
+  if (micBusy) return; // a double tap must not immediately undo the first toggle
+  micBusy = true;
+  const current = micReplyGuard();
+  try { const muted = await act.toggleMute(S.mic.source); if (current()) setMic(muted); }
+  catch (err) { toast(err.message, true); if (current()) await refreshMic(false); }
+  finally { micBusy = false; }
 };
 $('#gtimer').onclick = () => { if (gameTimer && confirm(t('confirm.stopGameTimer'))) { gameTimer = null; tickGameTimer(); } };
 

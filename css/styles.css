@@ -41,7 +41,12 @@ body.reorder .cell{transition:transform .18s ease}.cell.dragging{z-index:5;opaci
 .chk{display:flex;flex-wrap:wrap;gap:6px 16px}.chk label{font-size:14px;display:flex;align-items:center;gap:6px}
 .sec .alert{background:#a3262a}
 /* мик выключен — яркое быстрое мигание */
-#btnMic.alert{animation:micblink .4s steps(2) infinite}@keyframes micblink{0%{background:#ff1a1a;box-shadow:0 0 18px #ff1a1a}50%{background:#5a0d0d;box-shadow:none}}
+/* Confirmed OBS mute: slow section pulse, faster but smooth button emphasis. */
+.left.mic-muted{background:#371c24;animation:micpanel 3s ease-in-out infinite;border-radius:8px}
+#btnMic.alert{color:#fff;background:#a52c39;outline:2px solid #ed8790;outline-offset:-2px;animation:micblink 1.2s ease-in-out infinite}
+@keyframes micpanel{0%,100%{background:#281c25}50%{background:#54242e}}
+@keyframes micblink{0%,100%{background:#852332;box-shadow:inset 0 0 0 2px #ed8790}50%{background:#bd3947;box-shadow:inset 0 0 0 2px #ffd0d4}}
+@media(prefers-reduced-motion:reduce){.left.mic-muted,#btnMic.alert{animation:none}.left.mic-muted{background:#48212b}#btnMic.alert{background:#a52c39;box-shadow:inset 0 0 0 2px #ffd0d4}}
 /* индикатор буфера повтора (маленький, не кнопка) */
 .buf{padding:4px 8px;border-radius:6px;background:#333;font-size:12px;font-weight:600;cursor:pointer}.buf.on{background:#1f5f33}.buf.off{background:#a3262a}
 /* номер матча в шапке */
