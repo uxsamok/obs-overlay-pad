@@ -33,10 +33,17 @@
   </section>
   <div id="g"></div>
   <section class="box"><h3 data-i18n="settings.backup.title"></h3>
-    <button id="btnImportText" data-i18n="settings.backup.importText"></button>
-    <button id="btnExport" data-i18n="settings.backup.export"></button>
-    <label class="btn"><span data-i18n="settings.backup.import"></span><input id="fileImport" type="file" accept="application/json,.json" hidden></label>
-    <p class="hint" data-i18n="settings.backup.hint"></p>
+    <div class="backup-controls" role="group" aria-labelledby="backupImportLabel">
+      <span id="backupImportLabel" data-i18n="settings.backup.import"></span>
+      <button id="btnImportFile" data-i18n="backup.file"></button>
+      <button id="btnImportText" data-i18n="backup.text"></button>
+      <input id="fileImport" type="file" accept="application/json,.json" hidden>
+    </div>
+    <div class="backup-controls" role="group" aria-labelledby="backupExportLabel">
+      <span id="backupExportLabel" data-i18n="settings.backup.export"></span>
+      <button id="btnExportFile" data-i18n="backup.file"></button>
+      <button id="btnExportText" data-i18n="backup.text"></button>
+    </div>
   </section>
   <section class="box"><h3 data-i18n="settings.reset.title"></h3><button id="btnReset" class="danger" data-i18n="settings.reset.button"></button></section>
   <p class="ver">OBS Overlay Pad <span id="ver"></span></p>

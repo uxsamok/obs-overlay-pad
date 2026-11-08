@@ -106,7 +106,6 @@
   "settings.backup.title": "Backup",
   "settings.backup.export": "Export",
   "settings.backup.import": "Import",
-  "settings.backup.hint": "JSON file",
   "settings.reset.title": "Reset",
   "settings.reset.button": "Reset all settings",
   "cp.cancel": "Cancel",
@@ -136,9 +135,7 @@
   "th.image": "Image",
   "settings.cells.imageTitle": "Show the source's picture on the button (images only, updated by the refresh sources button)",
   "toast.images": "images: {n}",
-  "backup.fallback": "If {file} didn't download, copy the text or open it and save via Share → Save to Files.",
   "backup.copy": "Copy",
-  "backup.open": "Open",
   "backup.close": "Close",
   "backup.copied": "Copied",
   "backup.copyFail": "Couldn't copy — select the text manually",
@@ -159,8 +156,11 @@
   "health.hintEnc": "Encoder overloaded: use a hardware encoder or a faster preset, or lower the resolution.",
   "health.hintRender": "Rendering lags: close heavy apps, reduce sources/filters, or lower FPS.",
   "health.allOk": "All fine, nothing to do.",
-  "settings.backup.importText": "Import text",
   "backup.importTitle": "Import settings",
   "backup.paste": "Paste backup JSON (replaces current settings)",
-  "backup.invalid": "Not a valid OBS Overlay Pad backup"
+  "backup.invalid": "Not a valid OBS Overlay Pad backup",
+  "backup.file": "File",
+  "backup.text": "Text",
+  "backup.exportTitle": "Export settings",
+  "backup.exportHint": "Copy this JSON to save or transfer your backup"
 }

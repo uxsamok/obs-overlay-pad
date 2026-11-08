@@ -548,25 +548,47 @@ $('#v-settings').addEventListener('change', (e) => {
   }
   persist(); if (['type', 'label', 'duration', 'source'].includes(el.dataset.k) || el.dataset.g) renderSettings();
 });
-$('#btnExport').onclick = () => {
-  const out = JSON.parse(JSON.stringify(S)); // миниатюры (base64) — внутрь каждого пресета, файл самодостаточный
+// Keep text dialogs inside the visible viewport as the software keyboard opens.
+function showBackupDialog(d) {
+  d.classList.add('backup-editor');
+  const viewport = window.visualViewport;
+  const fit = () => {
+    d.style.setProperty('--backup-height', (viewport ? viewport.height : window.innerHeight) + 'px');
+    d.style.setProperty('--backup-top', (viewport ? viewport.offsetTop : 0) + 'px');
+  };
+  viewport?.addEventListener('resize', fit); viewport?.addEventListener('scroll', fit);
+  window.addEventListener('resize', fit);
+  d.addEventListener('close', () => {
+    viewport?.removeEventListener('resize', fit); viewport?.removeEventListener('scroll', fit);
+    window.removeEventListener('resize', fit); d.remove();
+  }, { once: true });
+  document.body.appendChild(d); fit(); d.showModal();
+}
+function backupJson() {
+  const out = JSON.parse(JSON.stringify(S)); // embedded thumbnails make either export portable
   for (const p of out.presets) { const m = {}; for (const [k, v] of images) if (k.startsWith(p.id + '|')) m[k.slice(p.id.length + 1)] = v; p.images = m; }
-  const json = JSON.stringify(out, null, 2); const fname = `obs-overlay-pad-${new Date().toISOString().slice(0, 10)}.json`;
+  return JSON.stringify(out, null, 2);
+}
+$('#btnExportFile').onclick = () => {
+  const json = backupJson(), fname = `obs-overlay-pad-${new Date().toISOString().slice(0, 10)}.json`;
   const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
   const a = document.createElement('a'); a.href = url; a.download = fname; a.style.display = 'none';
   document.body.appendChild(a); a.click(); setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 60000);
-  // запасной вариант для iPad: текст бэкапа, «Скопировать» и «Открыть»
+};
+$('#btnExportText').onclick = () => {
+  const json = backupJson();
   const d = document.createElement('dialog'); d.className = 'backup';
-  d.innerHTML = `<p>${esc(t('backup.fallback', { file: fname }))}</p><textarea readonly></textarea>
-    <div class="row"><button data-b="copy">${t('backup.copy')}</button><button data-b="open">${t('backup.open')}</button><button data-b="close">${t('backup.close')}</button></div>`;
-  const ta = d.querySelector('textarea'); ta.value = json; document.body.appendChild(d);
-  d.addEventListener('close', () => d.remove());
+  d.setAttribute('aria-labelledby', 'exportTitle');
+  d.innerHTML = `<h3 id="exportTitle">${t('backup.exportTitle')}</h3><label for="exportJson">${t('backup.exportHint')}</label><textarea id="exportJson" readonly></textarea>
+    <div class="row"><button data-b="copy">${t('backup.copy')}</button><button data-b="close" autofocus>${t('backup.close')}</button></div>`;
+  const ta = d.querySelector('textarea'); ta.value = json;
   d.onclick = (e) => { const b = e.target.dataset && e.target.dataset.b; if (!b) return;
     if (b === 'close') d.close();
     if (b === 'copy') { ta.focus(); ta.select(); ta.setSelectionRange(0, json.length); let ok = false; try { ok = document.execCommand('copy'); } catch {} toast(t(ok ? 'backup.copied' : 'backup.copyFail'), !ok); }
-    if (b === 'open') { const u = URL.createObjectURL(new Blob([json], { type: 'text/plain' })); if (!window.open(u, '_blank')) location.href = u; setTimeout(() => URL.revokeObjectURL(u), 60000); } };
-  d.showModal();
+  };
+  showBackupDialog(d);
 };
+$('#btnImportFile').onclick = () => $('#fileImport').click();
 async function importSettings(text) {
   const { state, thumbnails } = parseBackup(text);
   for (const [id, name, value] of thumbnails) await putImage(imgKey(id, name), value);
@@ -590,7 +612,6 @@ $('#btnImportText').onclick = () => {
     <div class="row"><button data-b="close">${t('backup.close')}</button><button data-b="import">${t('settings.backup.import')}</button></div>`;
   const ta = d.querySelector('textarea'), submit = d.querySelector('[data-b="import"]');
   let busy = false;
-  d.addEventListener('close', () => d.remove());
   d.addEventListener('cancel', (e) => { if (busy) e.preventDefault(); });
   d.onclick = async (e) => {
     if (busy) return;
@@ -602,7 +623,7 @@ $('#btnImportText').onclick = () => {
     catch (err) { d.querySelector('#importError').textContent = t('toast.importErr', { msg: err.message }); }
     finally { busy = false; submit.disabled = false; d.removeAttribute('aria-busy'); }
   };
-  document.body.appendChild(d); d.showModal(); ta.focus();
+  showBackupDialog(d); ta.focus();
 };
 $('#btnReset').onclick = () => { if (confirm(t('confirm.reset'))) { S = defaultState(); applyPreset(); renderSettings(); location.hash = '#settings'; window.scrollTo(0, 0); } };
 // Пустой кадр (весь прозрачный или одноцветный, например чёрный) — не сохраняем

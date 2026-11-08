@@ -106,7 +106,6 @@
   "settings.backup.title": "Резервная копия",
   "settings.backup.export": "Экспорт",
   "settings.backup.import": "Импорт",
-  "settings.backup.hint": "Файл JSON",
   "settings.reset.title": "Сброс",
   "settings.reset.button": "Сбросить все настройки",
   "cp.cancel": "Отмена",
@@ -136,9 +135,7 @@
   "th.image": "Картинка",
   "settings.cells.imageTitle": "Показывать картинку источника на кнопке (только изображения, обновляется кнопкой обновления источников)",
   "toast.images": "картинок: {n}",
-  "backup.fallback": "Если файл {file} не скачался, скопируйте текст или откройте его и сохраните через «Поделиться» → «Сохранить в Файлы».",
   "backup.copy": "Скопировать",
-  "backup.open": "Открыть",
   "backup.close": "Закрыть",
   "backup.copied": "Скопировано",
   "backup.copyFail": "Не удалось скопировать — выделите текст вручную",
@@ -159,8 +156,11 @@
   "health.hintEnc": "Кодировщик перегружен: аппаратный кодировщик, более быстрый пресет или ниже разрешение.",
   "health.hintRender": "Отрисовка не успевает: закрой тяжёлые программы, убери лишние источники и фильтры или снизь FPS.",
   "health.allOk": "Всё в порядке, ничего делать не нужно.",
-  "settings.backup.importText": "Импорт текста",
   "backup.importTitle": "Импорт настроек",
   "backup.paste": "Вставьте JSON резервной копии (заменит текущие настройки)",
-  "backup.invalid": "Это не резервная копия OBS Overlay Pad"
+  "backup.invalid": "Это не резервная копия OBS Overlay Pad",
+  "backup.file": "Файл",
+  "backup.text": "Текст",
+  "backup.exportTitle": "Экспорт настроек",
+  "backup.exportHint": "Скопируйте JSON, чтобы сохранить или перенести резервную копию"
 }

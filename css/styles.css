@@ -100,3 +100,10 @@ button,.btn,.cell,input,select,textarea,[role="button"],#buf{touch-action:manipu
 dialog.backup .row{flex-wrap:wrap}dialog.backup .row button{min-width:88px;min-height:44px}
 dialog.backup textarea{padding:8px;-webkit-user-select:text;user-select:text}dialog.backup{box-sizing:border-box;max-height:90dvh;overflow-y:auto}
 dialog.backup [role="alert"]{color:#ffafb6;white-space:pre-wrap}
+
+.backup-controls{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:10px 0}
+.backup-controls>span{min-width:90px;font-weight:600}.backup-controls button{min-width:88px;min-height:44px}
+dialog.backup-editor[open]{display:flex;flex-direction:column;gap:8px;position:fixed;top:calc(var(--backup-top,0px) + 12px);bottom:auto;left:0;right:0;margin:0 auto;height:min(560px,calc(var(--backup-height,100dvh) - 24px));max-height:calc(var(--backup-height,100dvh) - 24px);overflow-y:auto}
+dialog.backup-editor h3{margin:0}dialog.backup-editor textarea{flex:1 1 120px;min-height:64px;height:auto}
+dialog.backup-editor h3,dialog.backup-editor label,dialog.backup-editor .row{flex-shrink:0}
+dialog.backup-editor .row{margin-top:0}dialog.backup-editor [role="alert"]{margin:0;max-height:20%;overflow-y:auto;flex-shrink:0}
