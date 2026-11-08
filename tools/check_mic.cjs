@@ -27,12 +27,10 @@ const deferred = () => { let resolve, reject; const promise = new Promise((yes, 
 const event = (muted, source = 'Mic') => listeners.InputMuteStateChanged({ detail: { inputName: source, inputMuted: muted } });
 (async () => {
   run('setMic(true)');
-  assert(element('.left').classes.has('mic-muted'));
   assert(element('#btnMic').classes.has('alert'));
   assert.equal(element('#btnMic').textContent, 'hdr.micMuted');
   event(false, 'Other'); assert.equal(state(), true);
   event(false); assert.equal(state(), false);
-  assert(!element('.left').classes.has('mic-muted'));
   assert(element('#btnMic').classes.has('micon'));
   run('setMic(null)'); assert(element('#btnMic').classes.has('dim'));
   assert(!element('#btnMic').classes.has('micon'));
@@ -62,11 +60,10 @@ const event = (muted, source = 'Mic') => listeners.InputMuteStateChanged({ detai
   run('setMic(undefined)'); assert.equal(state(), null);
   assert.match(app, /function applyPreset\(\) \{\s*setMic\(null\)/);
   assert.match(app, /function connect\(\) \{ setMic\(null\)/);
-  assert.match(css, /micpanel 3s ease-in-out infinite/);
-  assert.match(css, /micblink 1\.2s ease-in-out infinite/);
-  assert.match(css, /prefers-reduced-motion:reduce\)\{\.left\.mic-muted,#btnMic\.alert\{animation:none\}/);
-  const micCss = css.slice(css.indexOf('/* Confirmed OBS mute:'), css.indexOf('/* Confirmed OBS mute:') + 1000);
-  assert(!/opacity:|visibility:|pointer-events:|position:fixed/.test(micCss));
+  assert(css.includes('#btnMic.alert{animation:micblink .4s steps(2) infinite}@keyframes micblink{0%{background:#ff1a1a;box-shadow:0 0 18px #ff1a1a}50%{background:#5a0d0d;box-shadow:none}}'));
+  assert(!/micpanel|mic-muted/.test(css), 'no left-panel mute styling');
+  assert(!app.includes("classList.toggle('mic-muted'"));
+  assert.match(css, /prefers-reduced-motion:reduce\)\{#btnMic\.alert\{animation:none;background:#ff1a1a/);
   assert(fs.readFileSync('sw.js', 'utf8').includes('overlay-pad-' + fs.readFileSync('VERSION', 'utf8').trim()));
   console.log('Mic state, stale replies, failed toggles, overlapping taps, CSS and version checks passed');
 })().catch((error) => { console.error(error); process.exitCode = 1; });

@@ -109,7 +109,6 @@ function setMic(m) {
   b.classList.toggle('alert', micMuted === true);
   b.classList.toggle('dim', micMuted == null);
   b.classList.toggle('micon', micMuted === false);
-  $('.left').classList.toggle('mic-muted', micMuted === true);
   b.textContent = t(micMuted === true ? 'hdr.micMuted' : 'hdr.mic');
 }
 // Ignore replies from an old preset/connection, or superseded by a newer OBS event.
