@@ -67,7 +67,6 @@ const event = (muted, source = 'Mic') => listeners.InputMuteStateChanged({ detai
   assert.match(css, /prefers-reduced-motion:reduce\)\{\.left\.mic-muted,#btnMic\.alert\{animation:none\}/);
   const micCss = css.slice(css.indexOf('/* Confirmed OBS mute:'), css.indexOf('/* Confirmed OBS mute:') + 1000);
   assert(!/opacity:|visibility:|pointer-events:|position:fixed/.test(micCss));
-  assert.equal(fs.readFileSync('VERSION', 'utf8').trim(), '1.20.0');
-  assert.match(fs.readFileSync('sw.js', 'utf8'), /overlay-pad-1\.20\.0/);
+  assert(fs.readFileSync('sw.js', 'utf8').includes('overlay-pad-' + fs.readFileSync('VERSION', 'utf8').trim()));
   console.log('Mic state, stale replies, failed toggles, overlapping taps, CSS and version checks passed');
 })().catch((error) => { console.error(error); process.exitCode = 1; });

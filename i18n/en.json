@@ -36,7 +36,7 @@
   "toast.overlaysHidden": "All overlays hidden",
   "toast.durationFixed": "Duration: minimum 0.5 s — set to 8 s",
   "toast.importOk": "Settings loaded",
-  "toast.importErr": "File error: {msg}",
+  "toast.importErr": "Import failed: {msg}",
   "toast.rescan": "Sources found: {n}",
   "toast.copied": "Copied",
   "confirm.stopGameTimer": "Stop the game timer?",
@@ -158,5 +158,9 @@
   "health.hintNet": "Network: lower the bitrate in OBS or free up the connection (stop downloads, use cable).",
   "health.hintEnc": "Encoder overloaded: use a hardware encoder or a faster preset, or lower the resolution.",
   "health.hintRender": "Rendering lags: close heavy apps, reduce sources/filters, or lower FPS.",
-  "health.allOk": "All fine, nothing to do."
+  "health.allOk": "All fine, nothing to do.",
+  "settings.backup.importText": "Import text",
+  "backup.importTitle": "Import settings",
+  "backup.paste": "Paste backup JSON (replaces current settings)",
+  "backup.invalid": "Not a valid OBS Overlay Pad backup"
 }

@@ -3,7 +3,7 @@ import { Actions } from './actions.js';
 import { openColorPicker } from './colorpicker.js';
 import { initI18n, setLang, getLang, languages, t, applyI18n } from './i18n.js';
 import { images, loadImages, putImage, deleteImage, imgKey } from './imgcache.js';
-import { load, save, normalize, resizeCells, defaultState, defaultPreset, normalizePreset, curPreset } from './store.js';
+import { load, save, normalize, resizeCells, defaultState, defaultPreset, normalizePreset, curPreset, parseBackup } from './store.js';
 
 await initI18n(); // язык — до загрузки состояния (тексты по умолчанию берутся из перевода)
 let S = load();
@@ -568,14 +568,42 @@ $('#btnExport').onclick = () => {
     if (b === 'open') { const u = URL.createObjectURL(new Blob([json], { type: 'text/plain' })); if (!window.open(u, '_blank')) location.href = u; setTimeout(() => URL.revokeObjectURL(u), 60000); } };
   d.showModal();
 };
+async function importSettings(text) {
+  const { state, thumbnails } = parseBackup(text);
+  for (const [id, name, value] of thumbnails) await putImage(imgKey(id, name), value);
+  // Persist only normalized settings, never embedded images.
+  save(state); S = state;
+  connect(); applyPreset(); renderSettings(); toast(t('toast.importOk'));
+}
 $('#fileImport').onchange = async (e) => {
   const f = e.target.files[0]; if (!f) return;
-  try { const raw = JSON.parse(await f.text());
-    const imgs = (raw.presets || []).map((p) => [String(p.id), p && p.images && typeof p.images === 'object' ? p.images : {}]);
-    S = normalize(raw);
-    for (const [id, m] of imgs) for (const [n, v] of Object.entries(m)) if (typeof v === 'string' && v.startsWith('data:image/')) await putImage(imgKey(id, n), v);
-    persist(); connect(); applyPreset(); renderSettings(); toast(t('toast.importOk')); } catch (err) { toast(t('toast.importErr', { msg: err.message }), true); }
-  e.target.value = '';
+  try { await importSettings(await f.text()); }
+  catch (err) { toast(t('toast.importErr', { msg: err.message }), true); }
+  finally { e.target.value = ''; }
+};
+$('#btnImportText').onclick = () => {
+  const d = document.createElement('dialog'); d.className = 'backup';
+  d.setAttribute('aria-labelledby', 'importTitle');
+  d.innerHTML = `<h3 id="importTitle">${t('backup.importTitle')}</h3>
+    <label for="importJson">${t('backup.paste')}</label>
+    <textarea id="importJson" spellcheck="false" autocapitalize="off" autocomplete="off" aria-describedby="importError"></textarea>
+    <p id="importError" role="alert"></p>
+    <div class="row"><button data-b="close">${t('backup.close')}</button><button data-b="import">${t('settings.backup.import')}</button></div>`;
+  const ta = d.querySelector('textarea'), submit = d.querySelector('[data-b="import"]');
+  let busy = false;
+  d.addEventListener('close', () => d.remove());
+  d.addEventListener('cancel', (e) => { if (busy) e.preventDefault(); });
+  d.onclick = async (e) => {
+    if (busy) return;
+    if (e.target.dataset.b === 'close') return d.close();
+    if (e.target.dataset.b !== 'import') return;
+    busy = true; submit.disabled = true; d.setAttribute('aria-busy', 'true');
+    d.querySelector('#importError').textContent = '';
+    try { await importSettings(ta.value); d.close(); }
+    catch (err) { d.querySelector('#importError').textContent = t('toast.importErr', { msg: err.message }); }
+    finally { busy = false; submit.disabled = false; d.removeAttribute('aria-busy'); }
+  };
+  document.body.appendChild(d); d.showModal(); ta.focus();
 };
 $('#btnReset').onclick = () => { if (confirm(t('confirm.reset'))) { S = defaultState(); applyPreset(); renderSettings(); location.hash = '#settings'; window.scrollTo(0, 0); } };
 // Пустой кадр (весь прозрачный или одноцветный, например чёрный) — не сохраняем

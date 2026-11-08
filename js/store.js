@@ -75,3 +75,28 @@ export function resizeCells(s) {
 }
 export function load() { try { return normalize(JSON.parse(localStorage.getItem(KEY))); } catch { return defaultState(); } }
 export function save(s) { localStorage.setItem(KEY, JSON.stringify(s)); }
+
+// Parse/validate before changing live settings or writing thumbnail data.
+export function parseBackup(text) {
+  const raw = JSON.parse(text);
+  const object = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
+  const invalid = () => { throw new Error(t('backup.invalid')); };
+  if (!object(raw)) invalid();
+  const modern = 'presets' in raw;
+  if (modern && (!Array.isArray(raw.presets) || !raw.presets.length)) invalid();
+  if (!modern && !Array.isArray(raw.cells)) invalid();
+  const presets = modern ? raw.presets : [raw];
+  for (const preset of presets) {
+    if (!object(preset)) invalid();
+    if (!Array.isArray(preset.cells) || !preset.cells.every(object)) invalid();
+    for (const key of ['grid', 'gameTimer', 'match', 'mic', 'obs', 'replay']) if (key in preset && !object(preset[key])) invalid();
+    if ('sceneButtons' in preset && !Array.isArray(preset.sceneButtons)) invalid();
+    if ('images' in preset && !object(preset.images)) invalid();
+  }
+  if ('streams' in raw && !Array.isArray(raw.streams)) invalid();
+  // Capture images before normalization strips them; use normalized IDs, including duplicates.
+  const embedded = presets.map((preset) => Object.entries(preset.images || {}).filter(([, value]) =>
+    typeof value === 'string' && /^data:image\/(?:png|jpeg|webp);base64,[a-z0-9+/]+={0,2}$/i.test(value)));
+  const state = normalize(raw);
+  return { state, thumbnails: state.presets.flatMap((preset, index) => embedded[index].map(([name, value]) => [preset.id, name, value])) };
+}
