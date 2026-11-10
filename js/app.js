@@ -86,7 +86,9 @@ async function playReplay() {
   await waitSave();
   await act.playLastReplay(S.replay.mediaSource);
 }
+let replayTimer = null; // автоскрытие повтора по кнопке в шапке (S.replay.duration)
 async function stopReplay(stopMedia = true) { // скрыть источник, остановить видео, погасить ячейки
+  clearTimeout(replayTimer); replayTimer = null;
   replayOn = false; setPlayBtn();
   for (const [i, st] of [...active]) if (S.cells[i]?.type === 'replay') { clearTimeout(st.timer); active.delete(i); updateCell(i); }
   try { await act.hide(S.replay.mediaSource); } catch (err) { toast(err.message, true); }
@@ -159,6 +161,7 @@ function renderPresetName() { $('#preset').textContent = S.presets.length > 1 ? 
 function applyPreset() {
   setMic(null);
   if (JSON.stringify(S.obs) !== connKey) connect(); // у пресета своё подключение
+  clearTimeout(replayTimer); replayTimer = null;
   clearActive(); replayOn = false; setPlayBtn(); refreshReplayBtn(); persist();
   renderMatch(); renderPresetName(); refreshMic(); pushMatch(); renderGrid(); syncActive();
   if (location.hash === '#settings') renderSettings();
@@ -408,7 +411,11 @@ $('#btnReplay').onclick = async () => {
 };
 $('#buf').onclick = () => obs.identified ? ensureBuffer() : toast(t('err.noObs'), true);
 $('#btnPlay').onclick = async () => {
-  try { if (replayOn || replayShown()) await stopReplay(); else { await playReplay(); replayOn = true; setPlayBtn(); } } catch (err) { toast(err.message, true); }
+  try { if (replayOn || replayShown()) await stopReplay(); else {
+    await playReplay(); replayOn = true; setPlayBtn();
+    const sec = +S.replay.duration || 0; clearTimeout(replayTimer);
+    if (sec > 0) replayTimer = setTimeout(() => { replayTimer = null; if (replayOn) stopReplay(); }, sec * 1000);
+  } } catch (err) { toast(err.message, true); }
 };
 $('#btnMic').onclick = async () => {
   if (!S.mic.source) return toast(t('toast.micNoSource'), true);
@@ -470,7 +477,8 @@ function renderSettings() {
     box(t('settings.hideAll.title'), `<div class="gset"><label>${t('settings.hideAll.scene')} ${pick('data-g="overlaysScene"', S.overlaysScene, act.scenes)}</label></div>
       <p class="hint">${t('settings.hideAll.hint')}</p>`) +
     box(t('settings.replay.title'), `<p class="hint">${t('settings.replay.hint')} <details><summary>${t('settings.replay.more')}</summary>${t('settings.replay.details')}</details></p>
-      <div class="gset"><label>${t('settings.replay.source')} ${pick('data-g="replay.mediaSource"', S.replay.mediaSource, act.inputs)}</label></div>`) +
+      <div class="gset"><label>${t('settings.replay.source')} ${pick('data-g="replay.mediaSource"', S.replay.mediaSource, act.inputs)}</label>
+      <label>${t('settings.replay.duration')} <input data-g="replay.duration" type="number" min="0" step="0.5" value="${+S.replay.duration || 0}" title="${esc(t('settings.replay.durationTitle'))}"></label></div>`) +
     box(t('settings.timer.title'), `<div class="gset"><label>${t('settings.timer.source')} ${pick('data-g="gameTimer.source"', S.gameTimer.source, act.inputs)}</label></div>
       <p class="hint">${t('settings.timer.cells')}</p>
       <div class="chk">${S.cells.map((c, i) => `<label><input type="checkbox" data-gt="${i}"${c.startGameTimer ? ' checked' : ''}> ${i + 1}. ${esc(c.label)}</label>`).join('')}</div>`) +

@@ -18,7 +18,7 @@ export function defaultPreset(name, id) {
     sceneButtons: [], // имена сцен OBS, показанных кнопками слева на главном экране
     mic: { source: '' }, // аудиовход OBS для кнопки «Мик»
     obs: defObs(), // подключение: у каждого пресета своё (пресет = машина/сеть)
-    replay: { mediaSource: '' },
+    replay: { mediaSource: '', duration: 0 }, // duration: сек показа по кнопке «Показать повтор», 0 = до конца видео
     cells: Array.from({ length: 12 }, (_, i) => defaultCell(i)),
   };
 }
