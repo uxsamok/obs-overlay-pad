@@ -6,7 +6,7 @@ export function defaultCell(i) {
 }
 // Пресеты (v3): поля из PKEYS живут в каждом пресете, остальное — общее.
 // Код читает S.cells / S.grid / ... как раньше: это геттеры/сеттеры на активный пресет (в JSON не попадают).
-export const PKEYS = ['cells', 'grid', 'overlaysScene', 'gameTimer', 'match', 'sceneButtons', 'mic', 'obs', 'replay'];
+export const PKEYS = ['cells', 'grid', 'overlaysScene', 'gameTimer', 'match', 'sceneButtons', 'mic', 'obs', 'replay', 'shot'];
 const defObs = () => ({ host: location.hostname || '192.168.1.50', port: 4455, password: '' });
 export function defaultPreset(name, id) {
   return {
@@ -19,6 +19,7 @@ export function defaultPreset(name, id) {
     mic: { source: '' }, // аудиовход OBS для кнопки «Мик»
     obs: defObs(), // подключение: у каждого пресета своё (пресет = машина/сеть)
     replay: { mediaSource: '', seconds: 30 }, // seconds: сколько последних секунд показывает «Показать повтор» (0–30)
+    shot: { source: '', folder: 'E:\\images' }, // эксперимент: скриншот источника в папку на машине с OBS (папку приложение не создаёт)
     cells: Array.from({ length: 12 }, (_, i) => defaultCell(i)),
   };
 }
@@ -32,7 +33,7 @@ export function defaultState() {
 }
 export function normalizePreset(p) {
   const d = defaultPreset(p && p.name, p && p.id); p = Object.assign(d, p || {});
-  for (const k of ['grid', 'gameTimer', 'match', 'mic', 'obs', 'replay']) p[k] = Object.assign(defaultPreset()[k], p[k]);
+  for (const k of ['grid', 'gameTimer', 'match', 'mic', 'obs', 'replay', 'shot']) p[k] = Object.assign(defaultPreset()[k], p[k]);
   p.match.value = +p.match.value || 0; if (!Array.isArray(p.sceneButtons)) p.sceneButtons = [];
   delete p.images; p.name = String(p.name || '').trim() || t('defaults.presetName'); p.id = String(p.id);
   resizeCells(p);
@@ -89,7 +90,7 @@ export function parseBackup(text) {
   for (const preset of presets) {
     if (!object(preset)) invalid();
     if (!Array.isArray(preset.cells) || !preset.cells.every(object)) invalid();
-    for (const key of ['grid', 'gameTimer', 'match', 'mic', 'obs', 'replay']) if (key in preset && !object(preset[key])) invalid();
+    for (const key of ['grid', 'gameTimer', 'match', 'mic', 'obs', 'replay', 'shot']) if (key in preset && !object(preset[key])) invalid();
     if ('sceneButtons' in preset && !Array.isArray(preset.sceneButtons)) invalid();
     if ('images' in preset && !object(preset.images)) invalid();
   }

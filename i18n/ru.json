@@ -165,5 +165,12 @@
   "backup.file": "Файл",
   "backup.text": "Текст",
   "backup.exportTitle": "Экспорт настроек",
-  "backup.exportHint": "Скопируйте JSON, чтобы сохранить или перенести резервную копию"
+  "backup.exportHint": "Скопируйте JSON, чтобы сохранить или перенести резервную копию",
+  "settings.exp.title": "Экспериментальное",
+  "settings.exp.shotSource": "Источник скриншота",
+  "settings.exp.shotFolder": "Папка (на компьютере с OBS)",
+  "settings.exp.shotBtn": "📷 Скриншот (эксперимент)",
+  "err.noShotSource": "Укажите источник скриншота: Настройки → Экспериментальное",
+  "err.noShotFolder": "Укажите папку: Настройки → Экспериментальное",
+  "toast.shotSaved": "Скриншот сохранён: {file}"
 }

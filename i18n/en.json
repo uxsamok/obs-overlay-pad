@@ -165,5 +165,12 @@
   "backup.file": "File",
   "backup.text": "Text",
   "backup.exportTitle": "Export settings",
-  "backup.exportHint": "Copy this JSON to save or transfer your backup"
+  "backup.exportHint": "Copy this JSON to save or transfer your backup",
+  "settings.exp.title": "Experimental",
+  "settings.exp.shotSource": "Screenshot source",
+  "settings.exp.shotFolder": "Save folder (on the OBS computer)",
+  "settings.exp.shotBtn": "📷 Screenshot (experimental)",
+  "err.noShotSource": "Set the screenshot source: Settings → Experimental",
+  "err.noShotFolder": "Set the save folder: Settings → Experimental",
+  "toast.shotSaved": "Screenshot saved: {file}"
 }

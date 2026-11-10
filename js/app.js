@@ -483,7 +483,10 @@ function renderSettings() {
       <label>${t('settings.match.source')} ${pick('data-g="match.source"', S.match.source, act.inputs)}</label>
       <label>${t('settings.match.template')} <input data-g="match.template" value="${esc(S.match.template)}"><span class="hint">${t('settings.match.templateHint')}</span></label>
       <label>${t('settings.match.value')} <input data-g="match.value" type="number" min="0" value="${S.match.value}"></label></div>`) +
-    box(t('settings.mic.title'), `<div class="gset"><label>${t('settings.mic.source')} ${pick('data-g="mic.source"', S.mic.source, renderSettings.mic || act.inputs)}</label></div>`);
+    box(t('settings.mic.title'), `<div class="gset"><label>${t('settings.mic.source')} ${pick('data-g="mic.source"', S.mic.source, renderSettings.mic || act.inputs)}</label></div>`) +
+    box(t('settings.exp.title'), `<div class="gset"><label>${t('settings.exp.shotSource')} ${pick('data-g="shot.source"', S.shot.source, [...act.inputs, ...act.scenes])}</label>
+      <label>${t('settings.exp.shotFolder')} <input data-g="shot.folder" value="${esc(S.shot.folder)}" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></label>
+      <label><button type="button" data-shot>${t('settings.exp.shotBtn')}</button></label></div>`);
   v.querySelector('tbody').innerHTML = S.cells.map((c, i) => `<tr data-i="${i}">
     <td>${i + 1}</td><td><input data-k="label" value="${esc(c.label)}"></td>
     <td><button type="button" class="swbtn" data-color="${i}" style="background:${esc(c.color)}" aria-label="${esc(t('settings.cells.color', { c: c.color }))}"></button></td>
@@ -527,6 +530,20 @@ $('#v-settings').addEventListener('click', (e) => { // пресеты: новы�
     for (const k of [...images.keys()]) if (k.startsWith(cur.id + '|')) deleteImage(k);
     S.presets = S.presets.filter((p) => p !== cur); S.activePreset = S.presets[0].id; applyPreset();
   }
+});
+$('#v-settings').addEventListener('click', async (e) => { // эксперимент: скриншот источника в папку на машине с OBS
+  if (!e.target.closest('[data-shot]')) return;
+  try {
+    if (!obs.identified) throw new Error(t('err.noObs'));
+    const src = (S.shot.source || '').trim(), dir = (S.shot.folder || '').trim().replace(/[\\/]+$/, '');
+    if (!src) throw new Error(t('err.noShotSource'));
+    if (!dir) throw new Error(t('err.noShotFolder'));
+    const d = new Date(), p2 = (n) => String(n).padStart(2, '0');
+    const name = `screenshot-${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}-${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}.png`;
+    const file = dir + (dir.includes('\\') || !dir.includes('/') ? '\\' : '/') + name;
+    await act.saveScreenshot(src, file);
+    toast(t('toast.shotSaved', { file }));
+  } catch (err) { toast(err.message, true); }
 });
 $('#v-settings').addEventListener('click', (e) => { // цвет ячейки -> всплывающий выбор
   const b = e.target.closest('[data-color]'); if (!b) return; const i = +b.dataset.color;

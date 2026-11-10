@@ -135,6 +135,8 @@ export class Actions extends EventTarget {
     return !sceneItemEnabled;
   }
   saveReplay() { return this.obs.call('SaveReplayBuffer'); }
+  // Эксперимент: PNG-скриншот источника/сцены в файл на машине с OBS
+  saveScreenshot(sourceName, imageFilePath) { return this.obs.call('SaveSourceScreenshot', { sourceName, imageFormat: 'png', imageFilePath }); }
   // Путь к последнему повтору: всегда свежий запрос в OBS (кэш — только запасной вариант)
   async getLastReplay() {
     try { const r = await this.obs.call('GetLastReplayBufferReplay'); if (r.savedReplayPath) return r.savedReplayPath; } catch {}
