@@ -140,7 +140,8 @@ export class Actions extends EventTarget {
     try { const r = await this.obs.call('GetLastReplayBufferReplay'); if (r.savedReplayPath) return r.savedReplayPath; } catch {}
     return this.lastReplay;
   }
-  async playLastReplay(mediaSource) {
+  // tailMs: показать только последние tailMs мс файла (null — играть целиком)
+  async playLastReplay(mediaSource, tailMs = null) {
     const path = await this.getLastReplay();
     if (!path) throw new Error(t('err.noReplays'));
     const ref = this.lookup(mediaSource);
@@ -151,6 +152,21 @@ export class Actions extends EventTarget {
     await this.obs.call('SetInputSettings', { inputName: mediaSource, inputSettings: { local_file: path, is_local_file: true, looping: false } });
     await this.setVisible(ref, true);
     try { await this.obs.call('TriggerMediaInputAction', { inputName: mediaSource, mediaAction: 'OBS_WEBSOCKET_MEDIA_INPUT_ACTION_RESTART' }); } catch {}
+    if (tailMs != null) await this.seekTail(mediaSource, tailMs);
+  }
+  // Перемотка уже после показа и RESTART (иначе «перезапуск при активации» вернёт в начало):
+  // ждём, пока файл откроется, ставим курсор на (длительность − tailMs), затем PLAY.
+  async seekTail(mediaSource, tailMs) {
+    let st = null;
+    for (let k = 0; k < 20; k++) { // до ~2 с
+      try { st = await this.obs.call('GetMediaInputStatus', { inputName: mediaSource }); } catch { st = null; }
+      if (st && st.mediaState === 'OBS_MEDIA_STATE_PLAYING' && st.mediaDuration > 0) break;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    const dur = st && st.mediaDuration > 0 ? st.mediaDuration : 30000; // буфер OBS — 30 с
+    const pos = Math.max(0, Math.round(dur - tailMs));
+    if (pos > 0) await this.obs.call('SetMediaInputCursor', { inputName: mediaSource, mediaCursor: pos });
+    try { await this.obs.call('TriggerMediaInputAction', { inputName: mediaSource, mediaAction: 'OBS_WEBSOCKET_MEDIA_INPUT_ACTION_PLAY' }); } catch {}
   }
   setScene(sceneName) { return this.obs.call('SetCurrentProgramScene', { sceneName }); }
   async currentScene() { return (await this.obs.call('GetCurrentProgramScene')).currentProgramSceneName; }

@@ -80,11 +80,12 @@ function syncReplayBtn(sceneName, sceneItemId, on) {
   if (!on) for (const [i, st] of [...active]) if (S.cells[i]?.type === 'replay') { clearTimeout(st.timer); active.delete(i); updateCell(i); }
 }
 async function refreshReplayBtn() { if (!obs.identified || !replayRef()) return; try { replayOn = await act.isVisible(S.replay.mediaSource); setPlayBtn(); } catch {} }
-async function playReplay() {
+function replaySeconds() { const n = Math.round(+S.replay.seconds); return Number.isFinite(n) ? Math.min(30, Math.max(0, n)) : 30; }
+async function playReplay(tailMs = null) {
   if (!obs.identified) throw new Error(t('err.noObs'));
   if (!S.replay.mediaSource) throw new Error(t('err.noReplaySource'));
   await waitSave();
-  await act.playLastReplay(S.replay.mediaSource);
+  await act.playLastReplay(S.replay.mediaSource, tailMs);
 }
 async function stopReplay(stopMedia = true) { // скрыть источник, остановить видео, погасить ячейки
   replayOn = false; setPlayBtn();
@@ -408,7 +409,10 @@ $('#btnReplay').onclick = async () => {
 };
 $('#buf').onclick = () => obs.identified ? ensureBuffer() : toast(t('err.noObs'), true);
 $('#btnPlay').onclick = async () => {
-  try { if (replayOn || replayShown()) await stopReplay(); else { await playReplay(); replayOn = true; setPlayBtn(); } } catch (err) { toast(err.message, true); }
+  try { if (replayOn || replayShown()) await stopReplay(); else {
+    const n = replaySeconds(); if (n === 0) return toast(t('toast.replayZero'), true); // 0 с — нечего показывать
+    await playReplay(n < 30 ? n * 1000 : null); replayOn = true; setPlayBtn();
+  } } catch (err) { toast(err.message, true); }
 };
 $('#btnMic').onclick = async () => {
   if (!S.mic.source) return toast(t('toast.micNoSource'), true);
@@ -470,7 +474,8 @@ function renderSettings() {
     box(t('settings.hideAll.title'), `<div class="gset"><label>${t('settings.hideAll.scene')} ${pick('data-g="overlaysScene"', S.overlaysScene, act.scenes)}</label></div>
       <p class="hint">${t('settings.hideAll.hint')}</p>`) +
     box(t('settings.replay.title'), `<p class="hint">${t('settings.replay.hint')} <details><summary>${t('settings.replay.more')}</summary>${t('settings.replay.details')}</details></p>
-      <div class="gset"><label>${t('settings.replay.source')} ${pick('data-g="replay.mediaSource"', S.replay.mediaSource, act.inputs)}</label></div>`) +
+      <div class="gset"><label>${t('settings.replay.source')} ${pick('data-g="replay.mediaSource"', S.replay.mediaSource, act.inputs)}</label>
+      <label>${t('settings.replay.seconds')} <input data-g="replay.seconds" type="number" min="0" max="30" step="1" value="${replaySeconds()}" title="${esc(t('settings.replay.secondsTitle'))}"></label></div>`) +
     box(t('settings.timer.title'), `<div class="gset"><label>${t('settings.timer.source')} ${pick('data-g="gameTimer.source"', S.gameTimer.source, act.inputs)}</label></div>
       <p class="hint">${t('settings.timer.cells')}</p>
       <div class="chk">${S.cells.map((c, i) => `<label><input type="checkbox" data-gt="${i}"${c.startGameTimer ? ' checked' : ''}> ${i + 1}. ${esc(c.label)}</label>`).join('')}</div>`) +
@@ -535,6 +540,7 @@ $('#v-settings').addEventListener('change', (e) => {
     const order = [...act.sceneOrder, ...S.sceneButtons]; S.sceneButtons = [...new Set(order)].filter((x) => set.has(x)); persist(); renderScenes(); return; }
   if (el.dataset.gt) { S.cells[+el.dataset.gt].startGameTimer = val; persist(); return; }
   if (el.dataset.g) {
+    if (el.dataset.g === 'replay.seconds') val = Math.min(30, Math.max(0, Math.round(val) || 0));
     const [a, b] = el.dataset.g.split('.'); if (b) S[a][b] = val; else S[a] = val;
     if (a === 'grid') resizeCells(S);
     if (a === 'obs') connect();
