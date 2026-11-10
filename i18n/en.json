@@ -79,8 +79,6 @@
   "settings.replay.more": "More",
   "settings.replay.details": "OBS: Settings → Output → Replay Buffer — enable, 30 s. Add a Media Source, untick Loop, hide it, choose it below. Then: «Save replay» → «Show replay».",
   "settings.replay.source": "Media source",
-  "settings.replay.duration": "Show time, s",
-  "settings.replay.durationTitle": "How long «Show replay» keeps the replay on screen. 0 = until the video ends.",
   "settings.timer.title": "Game timer",
   "settings.timer.source": "Text source",
   "settings.timer.cells": "Start on cell press",

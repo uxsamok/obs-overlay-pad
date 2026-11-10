@@ -79,8 +79,6 @@
   "settings.replay.more": "Подробнее",
   "settings.replay.details": "OBS: Настройки → Вывод → Буфер повтора — включить, 30 с. Добавьте «Медиа» (Media Source), снимите «Зациклить», скройте, выберите его ниже. Дальше: «Сохранить повтор» → «Показать повтор».",
   "settings.replay.source": "Медиаисточник",
-  "settings.replay.duration": "Время показа, с",
-  "settings.replay.durationTitle": "Сколько секунд повтор остаётся на экране по кнопке «Показать повтор». 0 = до конца видео.",
   "settings.timer.title": "Таймер игры",
   "settings.timer.source": "Текстовый источник",
   "settings.timer.cells": "Запускать при нажатии ячеек",
