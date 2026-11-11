@@ -295,12 +295,13 @@ const IMG_KINDS = new Set(['image_source', 'ffmpeg_source', 'vlc_source']);
 const VIDEO_KINDS = new Set(['ffmpeg_source', 'vlc_source']);
 const ICON_PLAY = '<svg class="vid" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>';
 const ICON_NOTE = '<svg class="vid" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/></svg>';
-// аудио (mp3, wav…) — по расширению файла в настройках медиаисточника: кадра нет, значок ноты
-const AUDIO_EXT = /\.(mp3|wav|ogg|oga|opus|flac|m4a|aac|wma|aif|aiff)$/i;
+// Кадр снимаем, только если хотя бы один путь — видео или картинка. Звук, папки (OBS не раскрывает их
+// содержимое через WebSocket) и неизвестное пропускаем молча: кадра нет, значок ноты
+const VISUAL_EXT = /\.(mp4|mkv|mov|webm|png|jpg|jpeg|webp|gif|apng|avif)$/;
 const audioSrc = new Set();
 async function isAudio(n) { try { const { inputSettings: st } = await obs.call('GetInputSettings', { inputName: n });
   const files = [st.local_file, ...(st.playlist || []).map((p) => p.value)].filter(Boolean);
-  const a = files.length > 0 && files.every((f) => AUDIO_EXT.test(f)); if (a) audioSrc.add(n); else audioSrc.delete(n); return a; } catch { return false; } }
+  const a = !files.some((f) => VISUAL_EXT.test(String(f).trim().toLowerCase())); if (a) audioSrc.add(n); else audioSrc.delete(n); return a; } catch { return false; } }
 async function detectAudio() { for (const n of new Set(S.cells.filter((c) => c.source && VIDEO_KINDS.has(act.kinds.get(c.source))).map((c) => c.source))) await isAudio(n); }
 function cellImg(c) {
   if (!c.image || c.type === 'counter' || c.type === 'replay' || !c.source) return '';
