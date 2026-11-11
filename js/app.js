@@ -297,7 +297,7 @@ const ICON_PLAY = '<svg class="vid" viewBox="0 0 24 24" aria-hidden="true"><path
 const ICON_NOTE = '<svg class="vid" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/></svg>';
 // Кадр снимаем, только если хотя бы один путь — видео или картинка. Звук, папки (OBS не раскрывает их
 // содержимое через WebSocket) и неизвестное пропускаем молча: кадра нет, значок ноты
-const VISUAL_EXT = /\.(mp4|mkv|mov|webm|png|jpg|jpeg|webp|gif|apng|avif)$/;
+const VISUAL_EXT = /\.(mp4|mkv|mov|webm|rmvb|wmv|3gp|ogv|m4v|mpg|vob|png|jpg|jpeg|webp|gif|apng|avif|bmp|svg|ico|tiff|heic|heif)$/;
 const audioSrc = new Set();
 async function isAudio(n) { try { const { inputSettings: st } = await obs.call('GetInputSettings', { inputName: n });
   const files = [st.local_file, ...(st.playlist || []).map((p) => p.value)].filter(Boolean);
