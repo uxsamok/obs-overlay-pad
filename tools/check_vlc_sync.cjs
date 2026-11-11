@@ -9,6 +9,8 @@ const settings = {
   'Clip': { local_file: 'E:\\v\\Clip.MP4' },
   'Mixed': { playlist: [{ value: 'E:\\music' }, { value: 'E:\\v\\goal.webm' }] },
   'Pictures': { playlist: [{ value: 'E:\\img\\logo.avif' }] },
+  'Scan': { local_file: 'E:\\img\\scan.TIF' },
+  'Tape': { local_file: 'E:\\v\\tape.mpeg' },
   'Phone photo': { local_file: 'E:\\img\\IMG_0001.HEIC' },
   'Old clip': { playlist: [{ value: 'E:\\music' }, { value: 'E:\\v\\old.m4v' }] },
 };
@@ -24,6 +26,8 @@ vm.runInContext(app.slice(app.indexOf('const VISUAL_EXT'), app.indexOf('async fu
   assert.equal(await skip('Clip'), false, 'uppercase .MP4 is a video');
   assert.equal(await skip('Mixed'), false, 'one video path is enough');
   assert.equal(await skip('Pictures'), false);
+  assert.equal(await skip('Scan'), false, '.TIF is an image');
+  assert.equal(await skip('Tape'), false, '.mpeg is a video');
   assert.equal(await skip('Phone photo'), false, '.HEIC is an image');
   assert.equal(await skip('Old clip'), false, '.m4v is a video');
   assert.ok(calls.every((c) => c === 'GetInputSettings'), 'no screenshot or media calls while deciding');
